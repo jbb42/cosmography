@@ -157,8 +157,8 @@ function plot_matrix(Y, t_steps, r, r_b, filename;
         )
     end
     display(p)
-    savefig(filename * ".tex")
-    savefig(filename * ".pdf")
+    savefig("./plots/" * filename * ".tex")
+    savefig("./plots/" * filename * ".pdf")
 end
 
 # --- THE FIX IS HERE ---
