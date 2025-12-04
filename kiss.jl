@@ -140,6 +140,9 @@ t_grid = range(t_i, t_0, length=1000)
 A_matrix = zeros(length(t_grid), length(r))
 Ar_matrix = zeros(length(t_grid), length(r))
 Arr_matrix = zeros(length(t_grid), length(r))
+A_t_matrix = zeros(length(t_grid), length(r))
+A_tr_matrix = zeros(length(t_grid), length(r))
+A_trr_matrix = zeros(length(t_grid), length(r))
 
 for (i, t) in enumerate(t_grid)
     # The solver object (sol_ltb) is a continuous function.
@@ -150,45 +153,57 @@ for (i, t) in enumerate(t_grid)
     A_matrix[i, :] = u_at_t[1:N]
     Ar_matrix[i, :] = u_at_t[N+1:2N]
     Arr_matrix[i, :] = u_at_t[2N+1:end]
-end
-struct interpolated
-A = cubic_spline_interpolation((t_grid, r), A_matrix)
-A_r = cubic_spline_interpolation((t_grid, r), Ar_matrix)
-A_rr = cubic_spline_interpolation((t_grid, r), Arr_matrix)
 
-# ==============================================================================
-# KISS Ray Tracer Skeleton
-# ==============================================================================
-# Dependencies:
-# import Pkg; Pkg.add(["DifferentialEquations", "Plots"])
-# ==============================================================================
+    # Calculate A_t, A_tr, A_trr at this time step
+    A_t_matrix[i, :] = @. sqrt(p[1] + p[2]/A_matrix[i, :] + p[3]*A_matrix[i, :].^2)
+    A_tr_matrix[i, :] = @. (p[4]/A_matrix[i, :] - (p[5]*Ar_matrix[i, :])/(A_matrix[i, :].^2) + p[6] + p[7]*A_matrix[i, :]*Ar_matrix[i, :]) / (2 * A_t_matrix[i, :])
+    A_trr_matrix[i, :] = @. ( (p[8] + p[9]/A_matrix[i, :] + (p[10]*Ar_matrix[i, :])/(A_matrix[i, :].^2) + (p[11]*Ar_matrix[i, :].^2)/(A_matrix[i, :].^3) - (p[5]*Arr_matrix[i, :])/(A_matrix[i, :].^2) + p[7]*Ar_matrix[i, :].^2 + p[7]*A_matrix[i, :]*Arr_matrix[i, :]) - 2*A_tr_matrix[i, :].^2 ) / (2 * A_t_matrix[i, :])
+
+end
+struct Itpl
+    A
+    A_r
+    A_rr
+    A_t
+    A_tr
+    A_trr
+end
+
+itpl = Itpl(cubic_spline_interpolation((t_grid, r), A_matrix),
+            cubic_spline_interpolation((t_grid, r), Ar_matrix),
+            cubic_spline_interpolation((t_grid, r), Arr_matrix),
+            cubic_spline_interpolation((t_grid, r), A_t_matrix),
+            cubic_spline_interpolation((t_grid, r), A_tr_matrix),
+            cubic_spline_interpolation((t_grid, r), A_trr_matrix))
 
 function geodesic_eq!(du, u, p, λ)
     # Unpack state: position (x) and velocity (k)
     x = u[1:4]
-    k = u[5:8]
+    v = u[5:8]
     
     # dx/dλ = k
-    du[1:4] = k
+    du[1:4] = v
     
-    A = A(x[1], x[2])
-    A_r = A_r(x[1], x[2])
-    A_rr = A_rr(x[1], x[2])
-    A_t = A_t(x[1], x[2])
-    A_tr = A_tr(x[1], x[2])
+    A = itpl.A(x[1], x[2])
+    A_r = itpl.A_r(x[1], x[2])
+    A_rr = itpl.A_rr(x[1], x[2])
+    A_t = itpl.A_t(x[1], x[2])
+    A_tr = itpl.A_tr(x[1], x[2])
 
-    @. du[5] = -(A_tr*A_r)/(c^2*(1-k(x[2]))) * k[2]^2 - (A*A_t)/c^2 * k[3]^2 - (A*A_t*sin(θ)^2)/c^2 * k[4]^2
-    @. du[6] = - 2*(A_tr/A_r) * k[1]*k[2] - (A_rr/A_r + k_r(x[2])/(2-2*k(x[2]))) * k[2]^2 + (A/A_r)*(1-k(x[2])) * k[3]^2 + (A/A_r)*(1-k(x[2]))*sin(θ)^2 * k[4]^2
-    @. du[7] = - 2*(A_t/A) * k[1]*k[3] - 2*(A_r/A) * k[2]*k[3] + cos(θ)*sin(θ) * k[4]^2
-    @. du[8] = - 2*(A_t/A) * k[1]*k[4] - 2*(A_r/A) * k[2]*k[4] - 2*(cos(θ)/sin(θ)) * k[3]*k[4]
+    du[5] = -(A_tr*A_r)/(c^2*(1-k(x[2]))) * v[2]^2 - (A*A_t)/c^2 * v[3]^2 - (A*A_t*sin(x[3])^2)/c^2 * v[4]^2
+    du[6] = - 2*(A_tr/A_r) * v[1]*v[2] - (A_rr/A_r + k_r(x[2])/(2-2*k(x[2]))) * v[2]^2 + (A/A_r)*(1-k(x[2])) * v[3]^2 + (A/A_r)*(1-k(x[2]))*sin(x[3])^2 * v[4]^2
+    du[7] = - 2*(A_t/A) * v[1]*v[3] - 2*(A_r/A) * v[2]*v[3] + cos(x[3])*sin(x[3]) * v[4]^2
+    du[8] = - 2*(A_t/A) * v[1]*v[4] - 2*(A_r/A) * v[2]*v[4] - 2*(cos(x[3])/sin(x[3])) * v[3]*v[4]
 end
 
-# Helper: Find k^t for a null ray (light) given spatial direction
-# Simplified for DIAGONAL metrics (g_ti = 0)
+
 function solve_null_kt(x, k_spatial)
     g_tt = -c^2
     
-    spatial_part = A_r(x[1], x[2])^2 / (1 - k(x[2])) * k_spatial[1]^2 + A(x[1], x[2])^2 * k_spatial[2]^2 + A(x[1], x[2])^2 * sin(x[3])^2 * k_spatial[3]^2
+    A = itpl.A(x[1], x[2])
+    A_r = itpl.A_r(x[1], x[2])
+
+    spatial_part = A_r^2 / (1 - k(x[2])) * k_spatial[1]^2 + A^2 * k_spatial[2]^2 + A^2 * sin(x[3])^2 * k_spatial[3]^2
     
     argument = -spatial_part / g_tt
     
@@ -205,7 +220,7 @@ end
 # ==============================================================================
 
 # --- SETUP INITIAL CONDITIONS ---
-x0 = [0.0, 10.0, π/2, 0.0]        # Initial Position
+x0 = [t_i, 10.0, π/2, 0.0]        # Initial Position
 k_spatial = [-1.0, 0.0, 0.1]      # Spatial Velocity (dr, dθ, dϕ)
 
 # Calculate required time component for a photon
@@ -222,3 +237,4 @@ sol = solve(prob, Tsit5(), reltol=1e-8, abstol=1e-8)
 r = sol[2, :]
 phi = sol[4, :]
 plot(r .* cos.(phi), r .* sin.(phi), aspect_ratio=:equal, label="Ray Path")
+plot!(xlabel="x (Mpc)", ylabel="y (Mpc)", title="KISS Ray Tracer in LTB Universe")
