@@ -27,7 +27,7 @@ G_N = 4.498234911e-15    # G in Mpc^3/(M_sun*Gyr^2)
 Ω_Λ = 0.7
 Ω_m = 0.3
 r_b = 100.0
-r = range(1, r_b*1.2, 150)
+r = range(1, r_b*1.2, 1_000)
 k_max = 5.4e-8#1
 n = m = 4
 a_i = 1/1200
@@ -52,7 +52,7 @@ M_rr(r) = @. 4/3*pi*G_N*a_i^3*rho_bg/c^2*(6*r + 3/5*c^2/(a_i*H_i)^2*(2*k_r(r)+r*
 # Initial conditions
 
 tspan = (t_i, t_0)
-t_steps = [0.002, 0.01, 0.05, 0.2, 0.5, 1.0]*t_0 
+#t_steps = [0.002, 0.01, 0.05, 0.2, 0.5, 1.0]*t_0 
 # Initial conditions
 A_i = collect(a_i .* r)
 A_r_i = fill(a_i, length(r))
@@ -119,118 +119,126 @@ end
 
 # Solve...
 prob = ODEProblem(ode!, u0, tspan, p)
-sol = solve(prob, Tsit5(), saveat=t_steps, reltol=1e-6, abstol=1e-6)
+sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12)
 
 # 1. Calculate the Raw Matrices
-A = Array(sol(t_steps))[1:length(r), :]
-A_r = Array(sol(t_steps))[length(r)+1:2*length(r), :]
-A_rr = Array(sol(t_steps))[2*length(r)+1:3*length(r), :]
+A = Array(sol)[1:length(r), :]
+A_r = Array(sol)[length(r)+1:2*length(r), :]
+A_rr = Array(sol)[2*length(r)+1:3*length(r), :]
 
 A_t = @. sqrt(p[1] + p[2]/A + p[3]*A^2)
 A_tr = @. (p[4]/A - (p[5]*A_r)/(A^2) + p[6] + p[7]*A*A_r) / (2 * A_t)
 A_trr = @. ( (p[8] + p[9]/A + (p[10]*A_r)/(A^2) + (p[11]*A_r^2)/(A^3) - (p[5]*A_rr)/(A^2) + p[7]*A_r^2 + p[7]*A*A_rr) - 2*A_tr^2 ) / (2 * A_t)
 
+t_steps = sol.t
 # Calculate Rho (This line works because @. handles the broadcasting automatically)
 rho = @. (c^2 / (4*pi*G_N)) * (M_r(r) / (A^2 * A_r))
 
-"""
-    plot_matrix(Y, t_steps, r, r_b, filename; kwargs...)
-"""
-function plot_matrix(Y, t_steps, r, r_b, filename; 
-                     title="", ylabel="", legend_pos=:topright)
-    p = Plots.plot(
-        xlabel=L"r/r_b", 
-        ylabel=ylabel, 
-        title=title,
-        size = (400, 300),
-        legend = legend_pos,
-        legend_font_halign = :left
-    )
 
-    for (i, t) in enumerate(t_steps)
-        y_vals = @view Y[:, i]
-        Plots.plot!(
-            r ./ r_b, 
-            y_vals, 
-            label=L"t/t_0=%$(round(t/t_0, digits=3))",
-            linewidth=1.0
-        )
+using Interpolations
+t_grid = range(t_i, t_0, length=1000)
+A_matrix = zeros(length(t_grid), length(r))
+Ar_matrix = zeros(length(t_grid), length(r))
+Arr_matrix = zeros(length(t_grid), length(r))
+
+for (i, t) in enumerate(t_grid)
+    # The solver object (sol_ltb) is a continuous function.
+    # We evaluate it at our Regular Grid points.
+    u_at_t = sol(t)
+    
+    N = length(r)
+    A_matrix[i, :] = u_at_t[1:N]
+    Ar_matrix[i, :] = u_at_t[N+1:2N]
+    Arr_matrix[i, :] = u_at_t[2N+1:end]
+end
+
+A = cubic_spline_interpolation((t_grid, r), A_matrix)
+A_r = cubic_spline_interpolation((t_grid, r), Ar_matrix)
+A_rr = cubic_spline_interpolation((t_grid, r), Arr_matrix)
+
+A_t = @. sqrt(p[1] + p[2]/A + p[3]*A^2)
+A_tr = @. (p[4]/A - (p[5]*A_r)/(A^2) + p[6] + p[7]*A*A_r) / (2 * A_t)
+A_trr = @. ( (p[8] + p[9]/A + (p[10]*A_r)/(A^2) + (p[11]*A_r^2)/(A^3) - (p[5]*A_rr)/(A^2) + p[7]*A_r^2 + p[7]*A*A_rr) - 2*A_tr^2 ) / (2 * A_t)
+
+# ==============================================================================
+# KISS Ray Tracer Skeleton
+# ==============================================================================
+# Dependencies:
+# import Pkg; Pkg.add(["DifferentialEquations", "Plots"])
+# ==============================================================================
+
+function geodesic_eq!(du, u, p, λ)
+    # Unpack state: position (x) and velocity (k)
+    x = u[1:4]
+    k = u[5:8]
+    
+    # dx/dλ = k
+    du[1:4] = k
+    
+    # Get user-defined symbols
+    Γ = christoffel(x)
+    
+    # Geodesic Equation: dk^μ/dλ = -Γ^μ_αβ k^α k^β
+    for μ in 1:4
+        accel = 0.0
+        for α in 1:4
+            for β in 1:4
+                accel -= Γ[μ, α, β] * k[α] * k[β]
+            end
+        end
+        du[4+μ] = accel
     end
-    display(p)
-    savefig("./plots/" * filename * ".tex")
-    savefig("./plots/" * filename * ".pdf")
+    @. du[5] = -(A_tr*A_r)/(c^2*(1-k(r))) * k[2]^2 - (A*A_t)/c^2 * k[3]^2 - (A*A_t*sin(θ)^2)/c^2 * k[4]^2
+    @. du[6] = - 2*(A_tr/A_r) * k[1]*k[2] - (A_rr/A_r + k_r(r)/(2-2*k(r))) * k[2]^2 + (A/A_r)*(1-k(r)) * k[3]^2 + (A/A_r)*(1-k(r))*sin(θ)^2 * k[4]^2
+    @. du[7] = - 2*(A_t/A) * k[1]*k[3] - 2*(A_r/A) * k[2]*k[3] + cos(θ)*sin(θ) * k[4]^2
+    @. du[8] = - 2*(A_t/A) * k[1]*k[4] - 2*(A_r/A) * k[2]*k[4] - 2*(cos(θ)/sin(θ)) * k[3]*k[4]
 end
 
-# --- THE FIX IS HERE ---
-
-# 1. Plot A (Normalized)
-# We use a.(t_steps)' (transpose) to make it a 1x6 Row Vector.
-# r is 150x1. 
-# Result: (150x1) * (1x6) = 150x6 Matrix, matching A.
-plot_matrix(A ./ (r .* a.(t_steps)'), t_steps, r, r_b, "radial_profile";
-    title = L"Areal radius $A(t,r)$",
-    ylabel = L"A(t,r)/ar",
-    legend_pos = :topright
-)
-
-# 2. Plot A' (Normalized)
-# Divide A' columns by the row vector a(t)'
-plot_matrix(A_r ./ a.(t_steps)', t_steps, r, r_b, "derived_radial_profile";
-    title = L"Derivative $A'(t,r)$",
-    ylabel = L"A'(t,r)/a",
-    legend_pos = :bottomleft
-)
-
-rho_flrw = rho_bg*a_i^3 ./ a.(t_steps').^3
-
-# 3. Plot Density (Rho is already a matrix, pass directly)
-plot_matrix(rho./rho_flrw, t_steps, r, r_b, "density_profile";
-    title = L"Density $\rho(t,r)$",
-    ylabel = L"\rho(t,r)/\rho_\mathrm{FLRW}(t)",
-    legend_pos = :topleft
-)
-
-# 4. Plot A'' (Normalized)
-# Divide A'' columns by the row vector a(t)'
-plot_matrix(A_rr ./ (a.(t_steps)'), t_steps, r, r_b, "second_derived_radial_profile";
-    title = L"Second Derivative $A''(t,r)$",
-    ylabel = L"A''(t,r)/ar",
-    legend_pos = :topleft
-)
-
-
-
-
-function kodes!()
-    # ... setup aliases ...
-    dt = kt
-    dr = kr
-    dθ = kθ
-    dφ = kφ
+# Helper: Find k^t for a null ray (light) given spatial direction
+# Simplified for DIAGONAL metrics (g_ti = 0)
+function solve_null_kt(x, k_spatial)
+    g = metric(x)
     
-    # Pre-calculate terms for clarity/speed
-    # Assumes c is defined globally or passed in p
+    # Equation: g_tt * (k^t)^2 + g_xx * (k^x)^2 + ... = 0
+    # Solve for k^t: k^t = sqrt( - (spatial_part) / g_tt )
     
-    # 1. Time Component (needs 1/c^2 factors if t is physical time)
-    # Gamma^t_rr = (A_r * A_tr) / (c^2 * (1-k))
-    # Gamma^t_thth = (A * A_t) / c^2
-    @. dkt = -(A_tr*A_r)/(c^2*(1-k(r))) * dr^2 - (A*A_t)/c^2 * dθ^2 - (A*A_t*sin(θ)^2)/c^2 * dφ^2
-
-    # 2. Radial Component
-    # Gamma^r_tr = A_tr / A_r
-    # Gamma^r_rr = A_rr/A_r + k_r / 2(1-k)
-    # Gamma^r_thth = - A(1-k)/A_r
-    @. dkr = - 2*(A_tr/A_r) * dt*dr - (A_rr/A_r + k_r(r)/(2-2*k(r))) * dr^2 + (A/A_r)*(1-k(r)) * dθ^2 + (A/A_r)*(1-k(r))*sin(θ)^2 * dφ^2
-
-    # 3. Theta Component
-    # Gamma^th_t_th = A_t / A
-    # Gamma^th_r_th = A_r / A
-    # Gamma^th_ph_ph = -sin(th)cos(th)
-    @. dkθ = - 2*(A_t/A) * dt*dθ - 2*(A_r/A) * dr*dθ + cos(θ)*sin(θ) * dφ^2
-
-    # 4. Phi Component
-    # Gamma^ph_t_ph = A_t / A
-    # Gamma^ph_r_ph = A_r / A
-    # Gamma^ph_th_ph = cot(th)
-    @. dkφ = - 2*(A_t/A) * dt*dφ - 2*(A_r/A) * dr*dφ - 2*(cos(θ)/sin(θ)) * dθ*dφ
+    g_tt = g[1, 1]
+    
+    spatial_part = 0.0
+    for i in 2:4
+        # k_spatial indices are shifted by 1 relative to metric indices
+        spatial_part += g[i, i] * k_spatial[i-1]^2
+    end
+    
+    argument = -spatial_part / g_tt
+    
+    if argument < 0 
+        error("Metric signature or parameters invalid for null ray (argument < 0).") 
+    end
+    
+    # Returns positive root (future-directed)
+    return sqrt(argument)
 end
+
+# ==============================================================================
+# 3. EXECUTION
+# ==============================================================================
+
+# --- SETUP INITIAL CONDITIONS ---
+x0 = [0.0, 10.0, π/2, 0.0]        # Initial Position
+k_spatial = [-1.0, 0.0, 0.1]      # Spatial Velocity (dr, dθ, dϕ)
+
+# Calculate required time component for a photon
+kt = solve_null_kt(x0, k_spatial)
+u0 = vcat(x0, [kt; k_spatial])    # Combine into state vector
+
+# --- SOLVE ---
+tspan = (0.0, 100.0)
+prob = ODEProblem(geodesic_eq!, u0, tspan)
+sol = solve(prob, Tsit5(), reltol=1e-8, abstol=1e-8)
+
+# --- PLOT ---
+# Assuming spherical coords (r, phi) for 2D visualization
+r = sol[2, :]
+phi = sol[4, :]
+plot(r .* cos.(phi), r .* sin.(phi), aspect_ratio=:equal, label="Ray Path")
