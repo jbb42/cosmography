@@ -26,8 +26,8 @@ G_N = 4.498234911e-15    # G in Mpc^3/(M_sun*Gyr^2)
 
 Ω_Λ = 0.7
 Ω_m = 0.3
-r_b = 100.0
-r = range(1, r_b*1.2, 1_000)
+r_b = 40.0
+r = range(1, r_b*12, 1_000)
 k_max = 5.4e-8#1
 n = m = 4
 a_i = 1/1200
@@ -220,15 +220,15 @@ end
 # ==============================================================================
 
 # --- SETUP INITIAL CONDITIONS ---
-x0 = [t_i, 10.0, π/2, 0.0]        # Initial Position
-k_spatial = [-1.0, 0.0, 0.1]      # Spatial Velocity (dr, dθ, dϕ)
+x0 = [t_i, 60.0, 0.01, 0.01]        # Initial Position
+k_spatial = [-1.0, 0.0, 0.01]      # Spatial Velocity (dr, dθ, dϕ)
 
 # Calculate required time component for a photon
 kt = solve_null_kt(x0, k_spatial)
 u0 = vcat(x0, [kt; k_spatial])    # Combine into state vector
 
 # --- SOLVE ---
-tspan = (t_i, 10.0)
+tspan = (t_i, 60)
 prob = ODEProblem(geodesic_eq!, u0, tspan)
 sol = solve(prob, Tsit5(), reltol=1e-8, abstol=1e-8)
 
@@ -237,4 +237,4 @@ sol = solve(prob, Tsit5(), reltol=1e-8, abstol=1e-8)
 r = sol[2, :]
 phi = sol[4, :]
 plot(r .* cos.(phi), r .* sin.(phi), aspect_ratio=:equal, label="Ray Path")
-plot!(xlabel="x (Mpc)", ylabel="y (Mpc)", title="KISS Ray Tracer in LTB Universe")
+plot!(xlabel="x (Mpc)", ylabel="y (Mpc)", title="Ray Tracer in LTB Universe")
