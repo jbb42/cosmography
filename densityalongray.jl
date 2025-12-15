@@ -158,22 +158,27 @@ rho(t,r)  = @. (c^2 / (4*pi*G_N)) * (M_r(r) / (full.A(t,r)^2 * full.A_r(t,r)))
 
 function geodesic_eq!(du, u, p, λ)
     # Unpack state: position (x) and velocity (k)
-    x = u[1:4]
+    X = u[1:4]
     K = u[5:8]
-    
-    # dx/dλ = k
-    du[1:4] = K
-    
-    A = full.A(x[1], x[2])
-    A_r = full.A_r(x[1], x[2])
-    A_rr = full.A_rr(x[1], x[2])
-    A_t = full.A_t(x[1], x[2])
-    A_tr = full.A_tr(x[1], x[2])
 
-    du[5] = -(A_tr*A_r)/(c^2*(1-k(x[2]))) * K[2]^2 - (A*A_t)/c^2 * K[3]^2 - (A*A_t*sin(x[3])^2)/c^2 * K[4]^2
-    du[6] = - 2*(A_tr/A_r) * K[1]*K[2] - (A_rr/A_r + k_r(x[2])/(2-2*k(x[2]))) * K[2]^2 + (A/A_r)*(1-k(x[2])) * K[3]^2 + (A/A_r)*(1-k(x[2]))*sin(x[3])^2 * K[4]^2
-    du[7] = - 2*(A_t/A) * K[1]*K[3] - 2*(A_r/A) * K[2]*K[3] + cos(x[3])*sin(x[3]) * K[4]^2
-    du[8] = - 2*(A_t/A) * K[1]*K[4] - 2*(A_r/A) * K[2]*K[4] - 2*(cos(x[3])/sin(x[3])) * K[3]*K[4]
+    dX = similar(X)
+    dK = similar(K)
+    # dx/dλ = k
+    dX[1:4] = K
+    
+    A = full.A(X[1], X[2])
+    A_r = full.A_r(X[1], X[2])
+    A_rr = full.A_rr(X[1], X[2])
+    A_t = full.A_t(X[1], X[2])
+    A_tr = full.A_tr(X[1], X[2])
+
+    dK[1] = -(A_tr*A_r)/(c^2*(1-k(X[2]))) * K[2]^2 - (A*A_t)/c^2 * K[3]^2 - (A*A_t*sin(X[3])^2)/c^2 * K[4]^2
+    dK[2] = - 2*(A_tr/A_r) * K[1]*K[2] - (A_rr/A_r + k_r(X[2])/(2-2*k(X[2]))) * K[2]^2 + (A/A_r)*(1-k(X[2])) * K[3]^2 + (A/A_r)*(1-k(X[2]))*sin(X[3])^2 * K[4]^2
+    dK[3] = - 2*(A_t/A) * K[1]*K[3] - 2*(A_r/A) * K[2]*K[3] + cos(X[3])*sin(X[3]) * K[4]^2
+    dK[4] = - 2*(A_t/A) * K[1]*K[4] - 2*(A_r/A) * K[2]*K[4] - 2*(cos(X[3])/sin(X[3])) * K[3]*K[4]
+
+    du[1:4] = dX
+    du[5:8] = dK
 end
 
 
@@ -183,9 +188,13 @@ grr(t,r) = full.A_r(t, r)^2 / (1 - k(r))
 gθθ(t,r) = full.A(t, r)^2
 gϕϕ(t,r,θ) = full.A(t, r)^2 * sin(θ)^2
 
-x0 = [t_0, 50.0, pi/2, 0.0]       # Initial Position
+x0 = [t_0, r_b*1.25, pi/2, 0.0]       # Initial Position
 
-kϕ0 = 0.01
+kt0 = -1/c
+kθ0 = 0.0
+kϕ0 = r_b / 2gϕϕ(x0[1], x0[2], x0[3])
+
+#kϕ0 = 0.001*r_b
 
 kr0 = -sqrt( ( -gtt() * kt0^2 - gθθ(x0[1], x0[2]) * kθ0^2 - gϕϕ(x0[1], x0[2], x0[3]) * kϕ0^2 ) / grr(x0[1], x0[2]) )
 
@@ -202,16 +211,55 @@ lspan = (0, 100)
 prob = ODEProblem(geodesic_eq!, u0, lspan)
 sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12)
 
-R = sol[2, :]
-phi = sol[4, :]
+z = sol[5, :] ./ sol[5, 1] .- 1
 
 println("Final t: ", sol[1, end])
 
-p = plot(xlabel="z", ylabel=L"\rho(t,r)/\rho_\mathrm{FLRW}(t_0)", title="Ray Tracer in LTB Universe", legend = :topright)
+p = plot(xlabel="z", ylabel=L"\rho(t,r)/\rho_\mathrm{FLRW}(t_0)", title="Ray Tracer in LTB Universe", legend = :topright, grid=true)
 #plot!(R .* cos.(phi), R .* sin.(phi), aspect_ratio=:equal)#, label="Ray Path")
 #plot!(sol[1, :], sol[2, :], label="Ray Path")
-plot!(1 ./a.(sol[1, :]).-1, rho(sol[1, :], sol[2, :])./(rho_bg*a_i^3), label="Density along Ray")
+plot!(z, rho(sol[1, :], sol[2, :])./(rho_bg*a_i^3 ./a.(sol[1, :]).^3), label="Density along Ray")
 
 println("Null condition: ", @. gtt() * sol[5,end]^2 + grr(sol[1, end], sol[2, end]) * sol[6,end]^2 + gθθ(sol[1, end], sol[2, end]) * sol[7,end]^2 + gϕϕ(sol[1, end], sol[2, end], sol[3, end]) * sol[8,end]^2 )
 
 display(p)
+
+#include("plots.jl")
+#plot_everything(full, [0.002, 0.01, 0.05, 0.2, 0.5, 1.0]*t_0 , range(1e-3, r_b*1.2, length=500), r_b)
+R = - (4pi*G_N/c^4) * rho(sol[1, :], sol[2, :]) .* sol[5, :].^2
+
+function transport_eq!(du, u, p, λ)
+    D = u[1:4]
+    v = u[5:8]
+
+    du[1:4] = v
+
+    # Reconstruct x(λ) and k(λ) using the geodesic solution
+    xλ = sol(λ)               # this is a vector
+    rt  = xλ[1]
+    rr  = xλ[2]
+    kt  = xλ[5]
+
+    R = -(4pi*G_N/c^4) * rho(rt, rr) * kt^2 * 1e16
+
+    du[5] = R * D[1]
+    du[6] = R * D[2]
+    du[7] = R * D[3]
+    du[8] = R * D[4]
+end
+
+
+D0 = [0.0, 0.0, 0.0, 0.0]
+v0 = [1.0, 0.0, 1.0, 0.0]
+u0 = vcat(D0, v0)
+prob = ODEProblem(transport_eq!, u0, lspan)
+λmin, λmax = lspan
+λsamples = range(λmin, λmax, length=2000)
+
+sol_D = solve(prob, Tsit5(); reltol=1e-12, abstol=1e-12, saveat=λsamples)
+plot(sol_D[1, :])
+plot!(sol_D[2, :])
+plot!(sol_D[3, :])
+plot!(sol_D[4, :])
+
+

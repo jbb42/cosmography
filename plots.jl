@@ -19,7 +19,7 @@ function plot_matrix(Y, t_steps, r, r_b, filename;
             linewidth=1.0
         )
     end
-    #display(p)
+    display(p)
     savefig("./plots/" * filename * ".tex")
     savefig("./plots/" * filename * ".pdf")
 end
