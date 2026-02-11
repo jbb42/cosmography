@@ -26,7 +26,7 @@ G_N = 4.498234911e-15  # G in Mpc^3/(M_sun*Gyr^2)
 Ω_m = 0.3
 r_b = 40.0
 r_grid = range(1e-3, r_b, length=1_000)
-k_max = 5.4e-8#1
+k_max = 5.4e-8
 n = m = 4
 a_i = 1/1200
 
@@ -230,7 +230,7 @@ sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12)
 
 z = sol[5, :] ./ sol[5, 1] .- 1
 
-p = plot(xlabel=L"z", ylabel=L"\rho(t,r)/\rho_\mathrm{FLRW}(t_0)", title=L"Ray Tracer in LTB Universe", legend = :topright, grid=true)
+p = plot(xlabel=L"z", ylabel=L"\rho(t,r)/\rho_\mathrm{FLRW}(t_0)", title="Ray Tracer in LTB Universe", legend = :topright, grid=true)
 plot!(z, rho(sol[1, :], sol[2, :])./(rho_bg*a_i^3 ./a.(sol[1, :]).^3), label="Density along Ray")
 
 display(p)
@@ -240,7 +240,7 @@ display(p)
 
 
 D_A = @. sqrt(sol[9, :]*sol[12, :] - sol[10, :]*sol[11, :])
-plot(z, D_A,
+p2 = plot(z, D_A,
     xlabel = L"\text{Redshift } z", 
     ylabel = L"\text{Angular diameter distance } d_A", 
     title=L"\text{Angular diameter distance } d_A \text{ along the light ray}", 
@@ -249,11 +249,54 @@ plot(z, D_A,
     legend = :topleft
 )
 using QuadGK
+
+H_FLRW(z_) = H_0*sqrt(Ω_m*(1+z_)^3 + Ω_Λ)
+
 # Comoving distance in flat FLRW
 function r_comoving_FLRW(z)
-    val, err = quadgk(zp -> 1/H_0/sqrt(Ω_m*(1+zp)^3 + Ω_Λ), 0, z)  # simple quadgk or similar
+    val, err = quadgk(z_ -> 1/H_FLRW(z_), 0, z)  # simple quadgk or similar
     return val
 end
 
 D_A_FLRW = [r_comoving_FLRW(z_) for z_ in z]*c
 plot!(z, D_A_FLRW./(1 .+ z), label=L"d_A \text{ (FLRW)}", linestyle=:dash)
+xlims!(0, 0.01)
+ylims!(0, 42)
+
+display(p2)
+
+"""
+Cosmography
+"""
+Nl = size(sol, 2)
+
+xµ = sol[1:4, :]
+kµ = sol[5:8, :]
+D = reshape(sol[9:12, :], 2, 2, Nl)
+Ddot = reshape(sol[13:16, :], 2, 2, Nl)
+
+S = [Ddot[:, :, i] / D[:, :, i] for i in 2:Nl] #skips first element to avoid singularity
+
+# Extracting components as vectors
+s11 = getindex.(S, 1, 1)
+s22 = getindex.(S, 2, 2)
+s12 = getindex.(S, 1, 2)
+s21 = getindex.(S, 2, 1)
+
+# Expansion: θ = 1/2 * Trace(S)
+θ_hat = 0.5 .* (s11 .+ s22)
+
+# Shear scalar: σ²
+# Using the dot syntax ensures we stay in vector-space
+σ_hat2 = 0.125 .* (s11.^2 .+ s22.^2 .+ s12.^2 .+ s21.^2 .- 2 .* s11 .* s22 .+ 2 .* s12 .* s21)
+
+thhat = plot(z[2:end], θ_hat, label=L"\hat{\theta}", xlabel=L"z", ylabel=L"\hat{\theta}", title="Cosmography along the ray", grid=true)
+plot!(z[2:end], (1 .+ z[2:end])./D_A_FLRW[2:end] - H_FLRW.(z[2:end])/c .* (1 .+ z[2:end]), label=L"(1 + z)/d_A - H_0/c (1+z)", linestyle=:dash)
+plot!(z[2:end], 1 ./ sol.t[2:end], label=L"1/\lambda", linestyle=:dashdot)
+ylims!(-1, 10)
+
+display(thhat)
+
+thdiff = plot(z[2:end], θ_hat .- ((1 .+ z[2:end])./D_A_FLRW[2:end] - H_FLRW.(z[2:end])/c .* (1 .+ z[2:end])), label=L"\hat{\theta} - ((1 + z)/d_A - H_0/c (1+z))", linestyle=:dash)
+ylims!(-1, 1)
+display(thdiff)
