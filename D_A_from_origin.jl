@@ -300,3 +300,75 @@ display(thhat)
 thdiff = plot(z[2:end], θ_hat .- ((1 .+ z[2:end])./D_A_FLRW[2:end] - H_FLRW.(z[2:end])/c .* (1 .+ z[2:end])), label=L"\hat{\theta} - ((1 + z)/d_A - H_0/c (1+z))", linestyle=:dash)
 ylims!(-1, 1)
 display(thdiff)
+
+
+
+# --- POST-PROCESSING: Shear Projection Explicitly ---
+
+# Prepare arrays
+N_points = length(sol.t)
+z_val = zeros(N_points)
+sigma_proj = zeros(N_points)
+
+# Loop over the light ray path
+for i in 1:N_points
+    # 1. Get coordinates and momenta at this step
+    t_i = sol[1, i]
+    r_i = sol[2, i]
+    th_i = sol[3, i]
+    
+    k_t = sol[5, i]
+    k_r = sol[6, i]
+    k_th = sol[7, i]
+    k_ph = sol[8, i]
+
+    # 2. Metric Derivatives (needed for H)
+    A_val = full.A(t_i, r_i)
+    Ar_val = full.A_r(t_i, r_i)
+    At_val = full.A_t(t_i, r_i)
+    Atr_val = full.A_tr(t_i, r_i)
+
+    # 3. Calculate Hubble Rates
+    H_R = Atr_val / Ar_val   # Radial Hubble rate
+    H_T = At_val / A_val     # Transverse Hubble rate
+    
+    # 4. Define Shear Eigenvalues (The 1/3 factors)
+    # Sigma_scalar = (H_R - H_T)
+    # These are mixed components (σ^i_j)
+    s_r_r   =  (2/3) * (H_R - H_T)
+    s_th_th = -(1/3) * (H_R - H_T)
+    s_ph_ph = -(1/3) * (H_R - H_T)
+
+    # 5. Metric Components (needed to lower indices for contraction)
+    # We need g_ii to turn (k^i)^2 into physical squared length
+    g_rr_val = Ar_val^2 / (1 - k(r_i))
+    g_th_th_val = A_val^2
+    g_ph_ph_val = A_val^2 * sin(th_i)^2
+
+    # 6. Calculate the Projection: σ_ab e^a e^b
+    # e^i = k^i / (c * k^t)
+    # The term we want is: sum( g_ii * s^i_i * (k^i)^2 ) / (c * k^t)^2
+    
+    norm_factor = 1.0 / (c * k_t)^2
+    
+    term_r  = g_rr_val    * s_r_r   * k_r^2
+    term_th = g_th_th_val * s_th_th * k_th^2
+    term_ph = g_ph_ph_val * s_ph_ph * k_ph^2
+    
+    sigma_proj[i] = (term_r + term_th + term_ph) * norm_factor
+
+    # (Optional) Calculate z for plotting
+    E_loc = c^2 * k_t
+    if i == 1; global E_obs = E_loc; end
+    z_val[i] = (E_loc / E_obs) - 1
+end
+
+# --- PLOTTING ---
+p_shear = plot(z_val, sigma_proj,
+    label=L"\sigma_{\mu\nu} e^\mu e^\nu",
+    xlabel=L"z",
+    ylabel=L"\text{Shear } [Gyr^{-1}]",
+    title="Shear along the line of sight",
+    lw=2
+)
+display(p_shear)
