@@ -6,8 +6,9 @@ using Interpolations
 using QuadGK
 
 # Plot as .tex (Tikz) files
-pgfplotsx()
-push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
+#pgfplotsx()
+#push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
+gr()
 default(linewidth=1, framestyle=:box, grid=true, label=nothing, legend=:topright)
 
 #=============================================================================#
@@ -259,7 +260,7 @@ s21 = getindex.(S, 2, 1)
 H = θ(x[1, :], x[2, :])/3 .+ σ_proj
 
 E0 = 1
-dA_z = @. -θ̂/(2*(1 + z[2:end])*E0*H[2:end])*dA[2:end]
+dA_z = @. -θ̂/(2*(1 + z[2:end])^2*E0*H[2:end])*dA[2:end] #*(-2c)
 
 p0 = plot(z[2:end], dA_z, 
     xlabel=L"z", 
@@ -272,7 +273,7 @@ display(p0)
 #dA_zz
 
 
-
+#=
 #=============================================================================#
 # Plotting
 #=============================================================================#
@@ -352,3 +353,4 @@ p9 = plot(z, H,
     label=L"\mathcal{H}")
 plot!(z, H_FLRW.(z), label=L"H_\mathrm{FLRW}", linestyle=:dash)
 display(p9)
+=#
