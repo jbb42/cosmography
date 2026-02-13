@@ -237,7 +237,7 @@ s22 = getindex.(S, 2, 2)
 s12 = getindex.(S, 1, 2)
 s21 = getindex.(S, 2, 1)
 # Expansion: θ̂ = (1/2) Tr(S)
-θ̂ = (s11 .+ s22)/2
+θ̂ = (s11 .+ s22) #/ 2
 
 # Shear scalar: σ̂²
 σ̂² = (s11.^2 .+ s22.^2 .+ s12.^2 .+ s21.^2 .- 2 * s11 .* s22 + 2 * s12 .* s21)/8
@@ -258,9 +258,10 @@ s21 = getindex.(S, 2, 1)
 )
 
 H = θ(x[1, :], x[2, :])/3 .+ σ_proj
-
-E0 = 1
-dA_z = @. -θ̂/(2*(1 + z[2:end])^2*E0*H[2:end])*dA[2:end] #*(-2c)
+    
+Eo = -c#1/c
+Ec = Eo/c^2
+dA_z = @. -θ̂/(2*(1 + z[2:end])^2*Ec*H[2:end])*dA[2:end] #*(-2c)
 
 p0 = plot(z[2:end], dA_z, 
     xlabel=L"z", 
@@ -270,10 +271,6 @@ p0 = plot(z[2:end], dA_z,
 plot!(z[2:end], diff(dA) ./ diff(z), label=L"\frac{d d_A}{dz} \, \mathrm{(numerical)}", linestyle=:dash)
 display(p0)
 
-#dA_zz
-
-
-#=
 #=============================================================================#
 # Plotting
 #=============================================================================#
@@ -353,4 +350,3 @@ p9 = plot(z, H,
     label=L"\mathcal{H}")
 plot!(z, H_FLRW.(z), label=L"H_\mathrm{FLRW}", linestyle=:dash)
 display(p9)
-=#
