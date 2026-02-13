@@ -152,7 +152,7 @@ gϕϕ(t, r, θ) = full.A(t, r)^2 * sin(θ)^2
 ρ(t, r) = @. (c^2 / (4*pi*G_N)) * (M_r(r) / (full.A(t,r)^2 * full.A_r(t,r)))
 θ(t, r) = @. (full.A_tr(t,r)/full.A_r(t,r) + 2*full.A_t(t,r)/full.A(t,r))
 σ²(t, r) = @. (1/3) * (full.A_tr(t,r)/full.A_r(t,r) - full.A_t(t,r)/full.A(t,r))^2
-R(t,r, kt) = (8*pi*G_N/c^4) * ρ(t,r) * kt^2 * c^4 # R = - 1/2 R_\mu\nu k^\mu k^\nu
+R(t,r, kt) = (8*pi*G_N/c^4) * ρ(t,r) * kt^2 * c^4 # R = R_\mu\nu k^\mu k^\nu
 
 #=============================================================================#
 # Ray tracing
@@ -271,6 +271,87 @@ p0 = plot(z[2:end], dA_z,
 plot!(z[2:end], diff(dA) ./ diff(z), label=L"\frac{d d_A}{dz} \, \mathrm{(numerical)}", linestyle=:dash)
 display(p0)
 
+
+
+
+#=============================================================================#
+# Second and Third Derivatives of Angular Diameter Distance
+#=============================================================================#
+
+# Compute k^μ k^ν R_{μν} along the ray
+# From the code: R(t,r, kt) = -1/2 R_{μν} k^μ k^ν
+# So: k^μ k^ν R_{μν} = R(t,r, kt)
+k_R_k = R.(x[1, :], x[2, :], k[1, :])
+
+# Compute dH/dλ numerically
+dH_dλ = diff(H) ./ diff(λ)
+# Pad to match dimensions (forward difference for last point)
+dH_dλ = vcat(dH_dλ, dH_dλ[end])
+
+# Compute d²H/dλ² numerically
+d2H_dλ2 = diff(dH_dλ) ./ diff(λ)
+d2H_dλ2 = vcat(d2H_dλ2, d2H_dλ2[end])
+
+# Compute d(k^μ k^ν R_{μν})/dλ numerically  
+dk_R_k_dλ = diff(k_R_k) ./ diff(λ)
+dk_R_k_dλ = vcat(dk_R_k_dλ, dk_R_k_dλ[end])
+
+# Second derivative of d_A with respect to z
+# Skip first element to match θ̂ dimensions (which starts at index 2)
+d2A_dz2 = @. (dA[2:end] / (2*(1+z[2:end])^4 * Ec^2 * H[2:end]^2)) * (
+    2*θ̂*Ec*H[2:end]*(1+z[2:end]) - 2*σ̂² - k_R_k[2:end] - (θ̂/H[2:end])*dH_dλ[2:end]
+)
+
+# Third derivative of d_A with respect to z
+# Note: The Weyl tensor term k^α k^β C_{ραςβ} σ̂^{ρς} is complex for LTB
+# For a diagonal shear tensor in LTB, this term may simplify or vanish
+# Here we include it as a placeholder (set to zero for now)
+Weyl_term = zeros(length(z[2:end]))  # Placeholder - needs proper calculation
+
+d3A_dz3 = @. (dA[2:end] / (2*(1+z[2:end])^6 * Ec^3 * H[2:end]^3)) * (
+    θ̂*k_R_k[2:end]/2 
+    - 2*Weyl_term
+    - 3*θ̂*σ̂² 
+    + 12*Ec*H[2:end]*σ̂²*(1+z[2:end])
+    + 6*Ec*H[2:end]*k_R_k[2:end]*(1+z[2:end])
+    + 6*Ec*θ̂*(1+z[2:end])*dH_dλ[2:end]
+    - 6*Ec^2*H[2:end]^2*θ̂*(1+z[2:end])^2
+    - 6*σ̂²/H[2:end]*dH_dλ[2:end]
+    - 3*k_R_k[2:end]/H[2:end]*dH_dλ[2:end]
+    - 3*θ̂/H[2:end]^2*dH_dλ[2:end]^2
+    + θ̂/H[2:end]*d2H_dλ2[2:end]
+    + dk_R_k_dλ[2:end]
+)
+
+# Plot second derivative
+p10 = plot(z[2:end], d2A_dz2, 
+    xlabel=L"z", 
+    ylabel=L"\frac{d^2 d_A}{dz^2} \, [\mathrm{Mpc}]",
+    title="Second derivative of angular diameter distance", 
+    label=L"\frac{d^2 d_A}{dz^2} \, \mathrm{(analytical)}")
+# Numerical second derivative for comparison
+plot!(z[3:end], diff(dA_z) ./ diff(z[2:end]), 
+    label=L"\frac{d^2 d_A}{dz^2} \, \mathrm{(numerical)}", 
+    linestyle=:dash)
+xlims!(0.0080, 0.0085)
+display(p10)
+
+# Plot third derivative
+p11 = plot(z[2:end], d3A_dz3, 
+    xlabel=L"z", 
+    ylabel=L"\frac{d^3 d_A}{dz^3} \, [\mathrm{Mpc}]",
+    title="Third derivative of angular diameter distance", 
+    label=L"\frac{d^3 d_A}{dz^3} \, \mathrm{(analytical)}")
+# Numerical third derivative for comparison
+plot!(z[3:end], diff(d2A_dz2) ./ diff(z[2:end]), 
+    label=L"\frac{d^3 d_A}{dz^3} \, \mathrm{(numerical)}", 
+    linestyle=:dash)
+xlims!(0.0080, 0.0085)
+display(p11)
+
+
+#=
+
 #=============================================================================#
 # Plotting
 #=============================================================================#
@@ -350,3 +431,4 @@ p9 = plot(z, H,
     label=L"\mathcal{H}")
 plot!(z, H_FLRW.(z), label=L"H_\mathrm{FLRW}", linestyle=:dash)
 display(p9)
+=#
