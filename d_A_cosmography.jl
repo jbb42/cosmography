@@ -32,8 +32,7 @@ n = m = 4
 
 # Initial conditions
 a_i = 1/1200
-r_grid = range(1e-3, r_b, length=10
-_000)
+r_grid = range(1e-3, r_b, length=1_000)
 
 # LCDM background
 t_of_a(a) = (2/3) * (1/H_0) / sqrt(Ω_Λ) * asinh(sqrt(Ω_Λ/Ω_m) * a^(3/2))
@@ -203,7 +202,7 @@ u0 = vcat(x0, k0, D0, D_λ0)
 # Raytracing from lambda=0 to lambda=100
 lspan = (0, 100)
 prob = ODEProblem(geodesic_eq!, u0, lspan)
-sol = solve(prob, Tsit5(), reltol=1e-16, abstol=1e-16)
+sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12)
 
 # Collecting solutions
 x = sol[1:4, :]
@@ -350,8 +349,8 @@ plot!(z[3:end], diff(d2A_dz2) ./ diff(z[2:end]),
 xlims!(0.0080, 0.0085)
 display(p11)
 
-
-
+dA_z1 = interpolate((z[2:end],), dA_z, Gridded(Cubic(Line())))
+print(dA_z1(0.0083))
 
 #=============================================================================#
 # Plotting
