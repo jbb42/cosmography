@@ -1,3 +1,4 @@
+#import Pkg; Pkg.add.(["DifferentialEquations", "Plots", "LaTeXStrings", "PGFPlotsX", "Interpolations", "QuadGK"])
 using DifferentialEquations
 using Plots
 using LaTeXStrings
