@@ -32,7 +32,8 @@ n = m = 4
 
 # Initial conditions
 a_i = 1/1200
-r_grid = range(1e-3, r_b, length=1_000)
+r_grid = range(1e-3, r_b, length=10
+_000)
 
 # LCDM background
 t_of_a(a) = (2/3) * (1/H_0) / sqrt(Ω_Λ) * asinh(sqrt(Ω_Λ/Ω_m) * a^(3/2))
@@ -202,14 +203,14 @@ u0 = vcat(x0, k0, D0, D_λ0)
 # Raytracing from lambda=0 to lambda=100
 lspan = (0, 100)
 prob = ODEProblem(geodesic_eq!, u0, lspan)
-sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12)
+sol = solve(prob, Tsit5(), reltol=1e-16, abstol=1e-16)
 
 # Collecting solutions
 x = sol[1:4, :]
 k = sol[5:8, :]
 λ = sol.t
 Nλ = size(sol, 2)
-
+print(Nλ)
 D = reshape(sol[9:12, :], 2, 2, Nλ)
 D_λ = reshape(sol[13:16, :], 2, 2, Nλ)
 
@@ -350,7 +351,7 @@ xlims!(0.0080, 0.0085)
 display(p11)
 
 
-#=
+
 
 #=============================================================================#
 # Plotting
@@ -431,4 +432,3 @@ p9 = plot(z, H,
     label=L"\mathcal{H}")
 plot!(z, H_FLRW.(z), label=L"H_\mathrm{FLRW}", linestyle=:dash)
 display(p9)
-=#
