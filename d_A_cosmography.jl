@@ -1,11 +1,11 @@
-#import Pkg; Pkg.add.(["DifferentialEquations", "Plots", "LaTeXStrings", "PGFPlotsX", "Interpolations", "QuadGK"])
+#import Pkg; Pkg.add.(["DifferentialEquations", "Plots", "LaTeXStrings", "PGFPlotsX", "Interpolations", "QuadGK", "ForwardDiff"])
 using DifferentialEquations
 using Plots
 using LaTeXStrings
 using PGFPlotsX
 using Interpolations
 using QuadGK
-
+using ForwardDiff
 # Plot as .tex (Tikz) files
 #pgfplotsx()
 #push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
@@ -104,36 +104,34 @@ prob = ODEProblem(ode!, u0, tspan, p)
 sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12)
 
 # Interpolate solution for A, A_r, A_rr and their time derivatives
-t_grid = range(t_i, t_0, length=1_000)
-u_matrix = stack(sol(t_grid))
-du_matrix = stack(sol(t_grid, Val{1}))
-
 N = length(r_grid)
+
 struct As
-    A; A_r; A_rr; A_t; A_tr; A_trr
+    A::Function
+    A_r::Function
+    A_rr::Function
+    A_t::Function
+    A_tr::Function
+    A_trr::Function
 end
 
-mat = As(
-    u_matrix[1:N, :]',
-    u_matrix[N+1:2N, :]',
-    u_matrix[2N+1:end, :]',
-    du_matrix[1:N, :]',
-    du_matrix[N+1:2N, :]',
-    du_matrix[2N+1:end, :]'
-)
+# For a given time t, return a 1D cubic spline in r
+function make_spatial_itp(vec)
+    # vec must be length(r_grid)
+    itp = cubic_spline_interpolation(r_grid, vec; extrapolation_bc=Line())
+    return r -> itp.(r)  # Return a callable function of r
+end
 
-make_itp(data) = cubic_spline_interpolation((t_grid, r_grid), data; extrapolation_bc=Line())
-
+# Now build the interpolated As object
 itpl = As(
-    make_itp(mat.A),
-    make_itp(mat.A_r),
-    make_itp(mat.A_rr),
-    make_itp(mat.A_t),
-    make_itp(mat.A_tr),
-    make_itp(mat.A_trr)
+    (t,r) -> make_spatial_itp(sol(t)[1:N])(r),
+    (t,r) -> make_spatial_itp(sol(t)[N+1:2N])(r),
+    (t,r) -> make_spatial_itp(sol(t)[2N+1:end])(r),
+    (t,r) -> make_spatial_itp(sol(t, Val{1})[1:N])(r),
+    (t,r) -> make_spatial_itp(sol(t, Val{1})[N+1:2N])(r),
+    (t,r) -> make_spatial_itp(sol(t, Val{1})[2N+1:end])(r)
 )
 
-# Extend A and its derivative to the FLRW region outside r_b
 full = As(
     (t, r) -> (r > r_b) ? a(t)*r : itpl.A(t, r),
     (t, r) -> (r > r_b) ? a(t) : itpl.A_r(t, r),
@@ -142,6 +140,7 @@ full = As(
     (t, r) -> (r > r_b) ? a_t(t) : itpl.A_tr(t, r),
     (t, r) -> (r > r_b) ? 0.0 : itpl.A_trr(t, r)
 )
+
 
 # LTB metric
 gtt() = -c^2
@@ -203,232 +202,189 @@ u0 = vcat(x0, k0, D0, D_λ0)
 # Raytracing from lambda=0 to lambda=100
 lspan = (0, 100)
 prob = ODEProblem(geodesic_eq!, u0, lspan)
-sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12)
+geodes = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12, dense=true)
 
 # Collecting solutions
-x = sol[1:4, :]
-k = sol[5:8, :]
-λ = sol.t
-Nλ = size(sol, 2)
-print(Nλ)
-D = reshape(sol[9:12, :], 2, 2, Nλ)
-D_λ = reshape(sol[13:16, :], 2, 2, Nλ)
+xt(λ) = geodes(λ)[1]
+xr(λ) = geodes(λ)[2]
+xθ(λ) = geodes(λ)[3]
+xϕ(λ) = geodes(λ)[4]
 
+kt(λ) = geodes(λ)[5]
+kr(λ) = geodes(λ)[6]
+kθ(λ) = geodes(λ)[7]
+kϕ(λ) = geodes(λ)[8]
+
+D(λ) = reshape(geodes(λ)[9:12], 2, 2)
+D_λ(λ) = reshape(geodes(λ)[13:16], 2, 2)
 
 #=============================================================================#
 # Cosmography calculations
 #=============================================================================#
 
-# Redshift defined using k_t
-z = k[1, :] ./ k[1, 1] .- 1
+z(λ) = kt(λ) / kt(0) - 1
 
-# Finding angular diameter distance in flat FLRW universe
+dA(λ) = sqrt(D(λ)[1, 1]*D(λ)[2, 2] - D(λ)[1, 2]*D(λ)[2, 1])
+
 r_comoving_FLRW(z) = first(quadgk(z_ -> 1/H_FLRW(z_), 0, z))
-dA_FLRW = [r_comoving_FLRW(z_) for z_ in z] * c
+dA_FLRW(λ) = r_comoving_FLRW(z(λ)) * c
 
-# Angular diameter distance for LTB from deviation matrix
-dA = sqrt.(D[1, 1, :].*D[2, 2, :] .- D[1, 2, :].*D[2, 1, :])
+S(λ) = D_λ(λ) / D(λ)
 
-# S = Ḋ/D (skip first element to avoid singularity)
-S = [D_λ[:, :, i] / D[:, :, i] for i in 2:Nλ]
+θ̂(λ) = (S(λ)[1, 1] .+ S(λ)[2, 2])
 
-# Extract components
-s11 = getindex.(S, 1, 1)
-s22 = getindex.(S, 2, 2)
-s12 = getindex.(S, 1, 2)
-s21 = getindex.(S, 2, 1)
-# Expansion: θ̂ = (1/2) Tr(S)
-θ̂ = (s11 .+ s22) #/ 2
+σ̂²(λ) = (S(λ)[1, 1]^2 + S(λ)[2, 2]^2 + S(λ)[1, 2]^2 + S(λ)[2, 1]^2 - 2 * S(λ)[1, 1] * S(λ)[2, 2] + 2 * S(λ)[1, 2] * S(λ)[2, 1])/8
 
-# Shear scalar: σ̂²
-σ̂² = (s11.^2 .+ s22.^2 .+ s12.^2 .+ s21.^2 .- 2 * s11 .* s22 + 2 * s12 .* s21)/8
 
 σrr(t,r) = (full.A_tr(t,r)./full.A_r(t,r) .- full.A_t(t,r)./full.A(t,r)) .* 2/3*grr.(t,r)
 σθθ(t,r) = (full.A_tr(t,r)./full.A_r(t,r) .- full.A_t(t,r)./full.A(t,r)) .* (-1/3*gθθ.(t,r))
 σϕϕ(t,r,θ) = (full.A_tr(t,r)./full.A_r(t,r) .- full.A_t(t,r)./full.A(t,r)) .* (-1/3*gϕϕ.(t,r, θ))
 
-σ_proj = (
-    # Radial Term: (v_r / c)^2 * σ_rr
-    (k[2,:] ./ (c * k[1,:])).^2 .* σrr.(x[1,:], x[2,:]) 
-    
-    # Theta Term: (v_θ / c)^2 * σ_θθ
-    .+ (k[3,:] ./ (c * k[1,:])).^2 .* σθθ.(x[1,:], x[2,:])
-    
-    # Phi Term: (v_φ / c)^2 * σ_φφ
-    .+ (k[4,:] ./ (c * k[1,:])).^2 .* σϕϕ.(x[1,:], x[2,:], x[3,:])
-)
 
-H = θ(x[1, :], x[2, :])/3 .+ σ_proj
-    
-Eo = -c#1/c
+σ_proj(λ) = ((kr(λ) / (c * kt(λ)))^2 * σrr(xt(λ), xr(λ)) 
+    + (kθ(λ) / (c * kt(λ)))^2 * σθθ(xt(λ), xr(λ))
+    + (kϕ(λ) / (c * kt(λ)))^2 * σϕϕ(xt(λ), xr(λ), xθ(λ)))
+
+H(λ) = θ(xt(λ), xr(λ))/3 + σ_proj(λ)
+
+Eo = -c
 Ec = Eo/c^2
-dA_z = @. -θ̂/(2*(1 + z[2:end])^2*Ec*H[2:end])*dA[2:end] #*(-2c)
-
-p0 = plot(z[2:end], dA_z, 
-    xlabel=L"z", 
-    ylabel=L"\frac{d d_A}{dz} \, [\mathrm{Mpc}]",
-    title="Derivative of angular diameter distance with respect to redshift", 
-    label=L"\frac{d d_A}{dz} \, \mathrm{(LTB)}")
-plot!(z[2:end], diff(dA) ./ diff(z), label=L"\frac{d d_A}{dz} \, \mathrm{(numerical)}", linestyle=:dash)
-display(p0)
-
-
 
 
 #=============================================================================#
-# Second and Third Derivatives of Angular Diameter Distance
+# Derivatives of angular diameter distance
 #=============================================================================#
 
-# Compute k^μ k^ν R_{μν} along the ray
-# From the code: R(t,r, kt) = -1/2 R_{μν} k^μ k^ν
-# So: k^μ k^ν R_{μν} = R(t,r, kt)
-k_R_k = R.(x[1, :], x[2, :], k[1, :])
+dA_z(λ) = -θ̂(λ)/(2*(1 + z(λ))^2*Ec*H(λ))*dA(λ)
 
-# Compute dH/dλ numerically
-dH_dλ = diff(H) ./ diff(λ)
-# Pad to match dimensions (forward difference for last point)
-dH_dλ = vcat(dH_dλ, dH_dλ[end])
+Rkk(λ) = R(xt(λ), xr(λ), kt(λ))
 
-# Compute d²H/dλ² numerically
-d2H_dλ2 = diff(dH_dλ) ./ diff(λ)
-d2H_dλ2 = vcat(d2H_dλ2, d2H_dλ2[end])
+H_λ(λ) = ForwardDiff.derivative(H, λ)
+H_λλ(λ) = ForwardDiff.derivative(H_λ, λ)
+Rkk_λ(λ) = ForwardDiff.derivative(Rkk, λ)
 
-# Compute d(k^μ k^ν R_{μν})/dλ numerically  
-dk_R_k_dλ = diff(k_R_k) ./ diff(λ)
-dk_R_k_dλ = vcat(dk_R_k_dλ, dk_R_k_dλ[end])
 
-# Second derivative of d_A with respect to z
-# Skip first element to match θ̂ dimensions (which starts at index 2)
-d2A_dz2 = @. (dA[2:end] / (2*(1+z[2:end])^4 * Ec^2 * H[2:end]^2)) * (
-    2*θ̂*Ec*H[2:end]*(1+z[2:end]) - 2*σ̂² - k_R_k[2:end] - (θ̂/H[2:end])*dH_dλ[2:end]
+dA_zz(λ) = (dA(λ) / (2*(1+z(λ))^4 * Ec^2 * H(λ)^2)) * (
+    2*θ̂(λ)*Ec*H(λ)*(1+z(λ)) - 2*σ̂²(λ) - Rkk(λ) - (θ̂(λ)/H(λ))*H_λ(λ)
 )
 
-# Third derivative of d_A with respect to z
-# Note: The Weyl tensor term k^α k^β C_{ραςβ} σ̂^{ρς} is complex for LTB
-# For a diagonal shear tensor in LTB, this term may simplify or vanish
-# Here we include it as a placeholder (set to zero for now)
-Weyl_term = zeros(length(z[2:end]))  # Placeholder - needs proper calculation
-
-d3A_dz3 = @. (dA[2:end] / (2*(1+z[2:end])^6 * Ec^3 * H[2:end]^3)) * (
-    θ̂*k_R_k[2:end]/2 
-    - 2*Weyl_term
-    - 3*θ̂*σ̂² 
-    + 12*Ec*H[2:end]*σ̂²*(1+z[2:end])
-    + 6*Ec*H[2:end]*k_R_k[2:end]*(1+z[2:end])
-    + 6*Ec*θ̂*(1+z[2:end])*dH_dλ[2:end]
-    - 6*Ec^2*H[2:end]^2*θ̂*(1+z[2:end])^2
-    - 6*σ̂²/H[2:end]*dH_dλ[2:end]
-    - 3*k_R_k[2:end]/H[2:end]*dH_dλ[2:end]
-    - 3*θ̂/H[2:end]^2*dH_dλ[2:end]^2
-    + θ̂/H[2:end]*d2H_dλ2[2:end]
-    + dk_R_k_dλ[2:end]
+dA_zzz(λ) = (dA(λ) / (2*(1+z(λ))^6 * Ec^3 * H(λ)^3)) * (
+    θ̂(λ)*Rkk(λ)/2 
+    - 2*0 # Setting Weyl term to zero
+    - 3*θ̂(λ)*σ̂²(λ) 
+    + 12*Ec*H(λ)*σ̂²(λ)*(1+z(λ))
+    + 6*Ec*H(λ)*Rkk(λ)*(1+z(λ))
+    + 6*Ec*θ̂(λ)*(1+z(λ))*H_λ(λ)
+    - 6*Ec^2*H(λ)^2*θ̂(λ)*(1+z(λ))^2
+    - 6*σ̂²(λ)/H(λ)*H_λ(λ)
+    - 3*Rkk(λ)/H(λ)*H_λ(λ)
+    - 3*θ̂(λ)/H(λ)^2*H_λ(λ)^2
+    + θ̂(λ)/H(λ)*H_λλ(λ)
+    + Rkk_λ(λ)
 )
-
-# Plot second derivative
-p10 = plot(z[2:end], d2A_dz2, 
-    xlabel=L"z", 
-    ylabel=L"\frac{d^2 d_A}{dz^2} \, [\mathrm{Mpc}]",
-    title="Second derivative of angular diameter distance", 
-    label=L"\frac{d^2 d_A}{dz^2} \, \mathrm{(analytical)}")
-# Numerical second derivative for comparison
-plot!(z[3:end], diff(dA_z) ./ diff(z[2:end]), 
-    label=L"\frac{d^2 d_A}{dz^2} \, \mathrm{(numerical)}", 
-    linestyle=:dash)
-xlims!(0.0080, 0.0085)
-display(p10)
-
-# Plot third derivative
-p11 = plot(z[2:end], d3A_dz3, 
-    xlabel=L"z", 
-    ylabel=L"\frac{d^3 d_A}{dz^3} \, [\mathrm{Mpc}]",
-    title="Third derivative of angular diameter distance", 
-    label=L"\frac{d^3 d_A}{dz^3} \, \mathrm{(analytical)}")
-# Numerical third derivative for comparison
-plot!(z[3:end], diff(d2A_dz2) ./ diff(z[2:end]), 
-    label=L"\frac{d^3 d_A}{dz^3} \, \mathrm{(numerical)}", 
-    linestyle=:dash)
-xlims!(0.0080, 0.0085)
-display(p11)
-
-dA_z1 = interpolate((z[2:end],), dA_z, Gridded(Cubic(Line())))
-print(dA_z1(0.0083))
 
 #=============================================================================#
 # Plotting
 #=============================================================================#
+λ_ = geodes.t[geodes.t .> 0]
 
-# Density along light ray
-p1 = plot(z, ρ(x[1, :], x[2, :]) ./ (rho_bg * a_i^3 ./ a.(x[1, :]).^3),
-    xlabel=L"z", ylabel=L"\rho/\rho_\mathrm{bg}",
-    title="Density along light ray")
-display(p1)
-
-# Expansion along light ray
-p2 = plot(z, θ(x[1, :], x[2, :]) ./ 3H_FLRW.(z),
-    xlabel=L"z", ylabel=L"\theta/\theta_\mathrm{bg}",
-    title="Expansion along light ray")
-display(p2)
-
-# Shear along light ray
-p3 = plot(z, 3sqrt.(σ²(x[1, :], x[2, :])) ./ H_FLRW.(z),
-    xlabel=L"z", ylabel=L"3\sigma/\theta_\mathrm{bg}",
-    title="Shear along light ray")
-display(p3)
-
-# Shear projection along light ray
-p4 = plot(z, σ_proj, 
-    label=L"\sigma_{\mu\nu} e^\mu e^\nu",
-    xlabel=L"z", 
-    ylabel=L"\sigma \, [\mathrm{Gyr}^{-1}]",
-    title="Shear projection vs shear along ray")
-plot!(z, -sqrt.(σ²(x[1, :], x[2, :])), label=L"-\sqrt{\sigma^2}", linestyle=:dash)
-display(p4)
-
-# Angular diameter distance
-p5 = plot(z, dA, 
+pdA = plot(z.(λ_), dA.(λ_), 
     xlabel=L"z", 
     ylabel=L"d_A \, [\mathrm{Mpc}]",
     title="Angular diameter distance", 
     grid=true, 
     label=L"d_A \, \mathrm{(LTB)}", 
     legend=:topleft)
-plot!(z, dA_FLRW ./ (1 .+ z), label=L"d_A \, \mathrm{(FLRW)}", linestyle=:dash)
+plot!(z.(λ_), dA_FLRW.(λ_) ./ (1 .+ z.(λ_)), label=L"d_A \, \mathrm{(FLRW)}", linestyle=:dash)
 xlims!(0, 0.01)
 ylims!(0, 42)
-display(p5)
+display(pdA)
+
+pdA_z = plot(z.(λ_), dA_z.(λ_), 
+    xlabel=L"z", 
+    ylabel=L"\frac{d d_A}{dz} \, [\mathrm{Mpc}]",
+    title="Derivative of angular diameter distance with respect to redshift", 
+    label=L"\frac{d d_A}{dz} \, \mathrm{(LTB)}")
+plot!(z.(λ_[2:end]), diff(dA.(λ_)) ./ diff(z.(λ_)), label=L"\frac{d d_A}{dz} \, \mathrm{(numerical)}", linestyle=:dash)
+display(pdA_z)
+
+pdA_zz = plot(z.(λ_), dA_zz.(λ_), 
+    xlabel=L"z", 
+    ylabel=L"\frac{d^2 d_A}{dz^2} \, [\mathrm{Mpc}]",
+    title="Second derivative of angular diameter distance", 
+    label=L"\frac{d^2 d_A}{dz^2} \, \mathrm{(LTB)}")
+plot!(z.(λ_[3:end]), diff(dA_z.(λ_[2:end])) ./ diff(z.(λ_[2:end])), label=L"\frac{d^2 d_A}{dz^2} \, \mathrm{(numerical)}", linestyle=:dash)
+xlims!(0.0080, 0.0085)
+display(pdA_zz)
+
+pdA_zzz = plot(z.(λ_), dA_zzz.(λ_), 
+    xlabel=L"z", 
+    ylabel=L"\frac{d^3 d_A}{dz^3} \, [\mathrm{Mpc}]",
+    title="Third derivative of angular diameter distance", 
+    label=L"\frac{d^3 d_A}{dz^3} \, \mathrm{(LTB)}")
+plot!(z.(λ_[3:end]), diff(dA_zz.(λ_[2:end])) ./ diff(z.(λ_[2:end])), label=L"\frac{d^3 d_A}{dz^3} \, \mathrm{(numerical)}", linestyle=:dash)
+xlims!(0.0080, 0.0085)
+display(pdA_zzz)
+
+# Density along light ray
+prho = plot(z.(λ_), ρ(xt.(λ_), xr.(λ_)) ./ (rho_bg * a_i^3 ./ a.(xt.(λ_)).^3),
+    xlabel=L"z", ylabel=L"\rho/\rho_\mathrm{bg}",
+    title="Density along light ray")
+display(prho)
+
+# Expansion along light ray
+ptheta = plot(z.(λ_), θ(xt.(λ_), xr.(λ_)) ./ 3H_FLRW.(z.(λ_)),
+    xlabel=L"z", ylabel=L"\theta/\theta_\mathrm{bg}",
+    title="Expansion along light ray")
+display(ptheta)
+
+# Shear along light ray
+psigma = plot(z.(λ_), 3sqrt.(σ²(xt.(λ_), xr.(λ_))) ./ H_FLRW.(z.(λ_)),
+    xlabel=L"z", ylabel=L"3\sigma/\theta_\mathrm{bg}",
+    title="Shear along light ray")
+display(psigma)
+
+# Shear projection along light ray
+psigmaproj = plot(z.(λ_), σ_proj.(λ_), 
+    label=L"\sigma_{\mu\nu} e^\mu e^\nu",
+    xlabel=L"z", 
+    ylabel=L"\sigma \, [\mathrm{Gyr}^{-1}]",
+    title="Shear projection vs shear along ray")
+plot!(z.(λ_), -sqrt.(σ²(xt.(λ_), xr.(λ_))), label=L"-\sqrt{\sigma^2}", linestyle=:dash)
+display(psigmaproj)
 
 # Expansion of light ray
-p6 = plot(z[2:end], θ̂, 
+pexpan = plot(z.(λ_), θ̂.(λ_), 
     label=L"\hat{\theta}",
     xlabel=L"z", 
     ylabel=L"\hat{\theta} \, [\mathrm{Gyr}^{-1}]",
     title="Expansion of light ray")  
-plot!(z[2:end], (1 .+ z[2:end]) ./ dA_FLRW[2:end] - H_FLRW.(z[2:end])/c .* (1 .+ z[2:end]),
+plot!(z.(λ_), (1 .+ z.(λ_)) ./ dA_FLRW.(λ_) - H_FLRW.(z.(λ_))/c .* (1 .+ z.(λ_)),
     label=L"(1 + z)/d_A - H(z)/c (1+z)", linestyle=:dash)
-plot!(z[2:end], 1 ./ λ[2:end], label=L"1/\lambda", linestyle=:dashdot)
+plot!(z.(λ_), 1 ./ λ_, label=L"1/\lambda", linestyle=:dashdot)
 ylims!(-1, 10)
-display(p6)
+display(pexpan)
 
 # Expansion difference
-p7 = plot(z[2:end], (θ̂ .- ((1 .+ z[2:end]) ./ dA_FLRW[2:end] - H_FLRW.(z[2:end])/c .* (1 .+ z[2:end])))./θ̂,
+pexpandiff = plot(z.(λ_), (θ̂.(λ_) .- ((1 .+ z.(λ_)) ./ dA_FLRW.(λ_) - H_FLRW.(z.(λ_))/c .* (1 .+ z.(λ_))))./θ̂.(λ_),
     xlabel=L"z", 
     ylabel=L"\Delta\hat{\theta} \, [\mathrm{Gyr}^{-1}]",
     title="Expansion difference from FLRW",
     label=L"(\hat{\theta} - \hat{\theta}_\mathrm{FLRW})/\hat{\theta}")
-display(p7)
+display(pexpandiff)
 
-# Shear projection
-p8 = plot(z[2:end], σ̂², 
+# Shear of light ray
+pshear = plot(z.(λ_), σ̂².(λ_), 
     xlabel=L"z", 
     ylabel=L"\hat{\sigma}^2 \, [\mathrm{Gyr}^{-2}]",
     title="Shear of light ray", 
     label=L"\hat{\sigma}^2")
-display(p8)
+display(pshear)
 
-p9 = plot(z, H, 
+pH = plot(z.(λ_), H.(λ_), 
     xlabel=L"z", 
     ylabel=L"\mathcal{H} \, [\mathrm{Gyr}^{-1}]",
     title="Hubble parameter along light ray", 
     label=L"\mathcal{H}")
-plot!(z, H_FLRW.(z), label=L"H_\mathrm{FLRW}", linestyle=:dash)
-display(p9)
+plot!(z.(λ_), H_FLRW.(z.(λ_)), label=L"H_\mathrm{FLRW}", linestyle=:dash)
+display(pH)
