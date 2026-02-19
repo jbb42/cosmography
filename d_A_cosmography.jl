@@ -110,7 +110,7 @@ end
 
 
 prob = ODEProblem(ode!, u0, tspan, p)
-sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12)
+sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12, dense=true)
 
 # Interpolate solution for A, A_r, A_rr and their time derivatives
 #=
@@ -177,7 +177,8 @@ A_r_intp = (t,r) -> fast_eval(sol, t, r, N)
 A_rr_intp = (t,r) -> fast_eval(sol, t, r, 2*N)
 A_t_intp = (t,r) -> fast_eval(sol, t, r, 0, true)
 A_tr_intp = (t,r) -> fast_eval(sol, t, r, N, true)
-# #GEMINI INSERT END
+
+# GEMINI INSERT END
 
 # Direct definitions - No middle step needed
 A(t, r)   = (r > r_b) ? a(t)*r   : A_intp(t, r)
@@ -340,28 +341,29 @@ end
 # Plotting
 #=============================================================================#
 λ_ = geodes.t[geodes.t .> 0.01]
+z_eval = z.(λ_)
 
-pdA = plot(z.(λ_), dA.(λ_), 
+pdA = plot(z_eval, dA.(λ_), 
     xlabel=L"z", 
     ylabel=L"d_A \, [\mathrm{Mpc}]",
     title="Angular diameter distance", 
     grid=true, 
     label=L"d_A \, \mathrm{(LTB)}", 
     legend=:topleft)
-plot!(z.(λ_), dA_FLRW.(λ_) ./ (1 .+ z.(λ_)), label=L"d_A \, \mathrm{(FLRW)}", linestyle=:dash)
+plot!(z_eval, dA_FLRW.(λ_) ./ (1 .+ z_eval), label=L"d_A \, \mathrm{(FLRW)}", linestyle=:dash)
 xlims!(0, 0.01)
 ylims!(0, 42)
 display(pdA)
 
-pdA_z = plot(z.(λ_), dA_z.(λ_), 
+pdA_z = plot(z_eval, dA_z.(λ_), 
     xlabel=L"z", 
     ylabel=L"\frac{d d_A}{dz} \, [\mathrm{Mpc}]",
     title="Derivative of angular diameter distance with respect to redshift", 
     label=L"\frac{d d_A}{dz} \, \mathrm{(LTB)}")
-plot!(z.(λ_[2:end]), diff(dA.(λ_)) ./ diff(z.(λ_)), label=L"\frac{d d_A}{dz} \, \mathrm{(numerical)}", linestyle=:dash)
+plot!(z.(λ_[2:end]), diff(dA.(λ_)) ./ diff(z_eval), label=L"\frac{d d_A}{dz} \, \mathrm{(numerical)}", linestyle=:dash)
 display(pdA_z)
 
-pdA_zz = plot(z.(λ_), dA_zz.(λ_), 
+pdA_zz = plot(z_eval, dA_zz.(λ_), 
     xlabel=L"z", 
     ylabel=L"\frac{d^2 d_A}{dz^2} \, [\mathrm{Mpc}]",
     title="Second derivative of angular diameter distance", 
@@ -370,7 +372,7 @@ plot!(z.(λ_[3:end]), diff(dA_z.(λ_[2:end])) ./ diff(z.(λ_[2:end])), label=L"\
 xlims!(0.0080, 0.0085)
 display(pdA_zz)
 
-pdA_zzz = plot(z.(λ_), dA_zzz.(λ_), 
+pdA_zzz = plot(z_eval, dA_zzz.(λ_), 
     xlabel=L"z", 
     ylabel=L"\frac{d^3 d_A}{dz^3} \, [\mathrm{Mpc}]",
     title="Third derivative of angular diameter distance", 
@@ -380,46 +382,46 @@ xlims!(0.0080, 0.0085)
 display(pdA_zzz)
 
 # Density along light ray
-prho = plot(z.(λ_), ρ(xt.(λ_), xr.(λ_)) ./ (rho_bg * a_i^3 ./ a.(xt.(λ_)).^3),
+prho = plot(z_eval, ρ(xt.(λ_), xr.(λ_)) ./ (rho_bg * a_i^3 ./ a.(xt.(λ_)).^3),
     xlabel=L"z", ylabel=L"\rho/\rho_\mathrm{bg}",
     title="Density along light ray")
 display(prho)
 
 # Expansion along light ray
-ptheta = plot(z.(λ_), θ(xt.(λ_), xr.(λ_)) ./ 3H_FLRW.(z.(λ_)),
+ptheta = plot(z_eval, θ(xt.(λ_), xr.(λ_)) ./ 3H_FLRW.(z_eval),
     xlabel=L"z", ylabel=L"\theta/\theta_\mathrm{bg}",
     title="Expansion along light ray")
 display(ptheta)
 
 # Shear along light ray
-psigma = plot(z.(λ_), 3sqrt.(σ²(xt.(λ_), xr.(λ_))) ./ H_FLRW.(z.(λ_)),
+psigma = plot(z_eval, 3sqrt.(σ²(xt.(λ_), xr.(λ_))) ./ H_FLRW.(z_eval),
     xlabel=L"z", ylabel=L"3\sigma/\theta_\mathrm{bg}",
     title="Shear along light ray")
 display(psigma)
 
 # Shear projection along light ray
-psigmaproj = plot(z.(λ_), σ_proj.(λ_), 
+psigmaproj = plot(z_eval, σ_proj.(λ_), 
     label=L"\sigma_{\mu\nu} e^\mu e^\nu",
     xlabel=L"z", 
     ylabel=L"\sigma \, [\mathrm{Gyr}^{-1}]",
     title="Shear projection vs shear along ray")
-plot!(z.(λ_), -sqrt.(σ²(xt.(λ_), xr.(λ_))), label=L"-\sqrt{\sigma^2}", linestyle=:dash)
+plot!(z_eval, -sqrt.(σ²(xt.(λ_), xr.(λ_))), label=L"-\sqrt{\sigma^2}", linestyle=:dash)
 display(psigmaproj)
 
 # Expansion of light ray
-pexpan = plot(z.(λ_), θ̂.(λ_), 
+pexpan = plot(z_eval, θ̂.(λ_), 
     label=L"\hat{\theta}",
     xlabel=L"z", 
     ylabel=L"\hat{\theta} \, [\mathrm{Gyr}^{-1}]",
     title="Expansion of light ray")  
-plot!(z.(λ_), (1 .+ z.(λ_)) ./ dA_FLRW.(λ_) - H_FLRW.(z.(λ_))/c .* (1 .+ z.(λ_)),
+plot!(z_eval, (1 .+ z_eval) ./ dA_FLRW.(λ_) - H_FLRW.(z_eval)/c .* (1 .+ z_eval),
     label=L"(1 + z)/d_A - H(z)/c (1+z)", linestyle=:dash)
-plot!(z.(λ_), 1 ./ λ_, label=L"1/\lambda", linestyle=:dashdot)
+plot!(z_eval, 1 ./ λ_, label=L"1/\lambda", linestyle=:dashdot)
 ylims!(-1, 10)
 display(pexpan)
 
 # Expansion difference
-pexpandiff = plot(z.(λ_), (θ̂.(λ_) .- ((1 .+ z.(λ_)) ./ dA_FLRW.(λ_) - H_FLRW.(z.(λ_))/c .* (1 .+ z.(λ_))))./θ̂.(λ_),
+pexpandiff = plot(z_eval, (θ̂.(λ_) .- ((1 .+ z_eval) ./ dA_FLRW.(λ_) - H_FLRW.(z_eval)/c .* (1 .+ z_eval)))./θ̂.(λ_),
     xlabel=L"z", 
     ylabel=L"\Delta\hat{\theta} \, [\mathrm{Gyr}^{-1}]",
     title="Expansion difference from FLRW",
@@ -427,19 +429,19 @@ pexpandiff = plot(z.(λ_), (θ̂.(λ_) .- ((1 .+ z.(λ_)) ./ dA_FLRW.(λ_) - H_F
 display(pexpandiff)
 
 # Shear of light ray
-pshear = plot(z.(λ_), σ̂².(λ_), 
+pshear = plot(z_eval, σ̂².(λ_), 
     xlabel=L"z", 
     ylabel=L"\hat{\sigma}^2 \, [\mathrm{Gyr}^{-2}]",
     title="Shear of light ray", 
     label=L"\hat{\sigma}^2")
 display(pshear)
 
-pH = plot(z.(λ_), H.(λ_), 
+pH = plot(z_eval, H.(λ_), 
     xlabel=L"z", 
     ylabel=L"\mathcal{H} \, [\mathrm{Gyr}^{-1}]",
     title="Hubble parameter along light ray", 
     label=L"\mathcal{H}")
-plot!(z.(λ_), H_FLRW.(z.(λ_)), label=L"H_\mathrm{FLRW}", linestyle=:dash)
+plot!(z_eval, H_FLRW.(z_eval), label=L"H_\mathrm{FLRW}", linestyle=:dash)
 display(pH)
 
 z0 = 1e-7
@@ -455,7 +457,7 @@ function z_range(z0, Δz=0.002)
     return λ_of_z(z_min:0.00001:z_max)
 end
 
-pTaylor = plot(z.(λ_), dA.(λ_), label=L"d_A \, \mathrm{(LTB)}", legend=:topleft,
+pTaylor = plot(z_eval, dA.(λ_), label=L"d_A \, \mathrm{(LTB)}", legend=:topleft,
     xlabel=L"z", ylabel=L"d_A \, [\mathrm{Mpc}]", title="Angular diameter distance with Taylor expansions", legendfonthalign = :left)
 plot!(z.(z_range(z0)), dA_exp(z0).(z.(z_range(z0))), label=latexstring("d_A \\, (z=$(z0))"), linestyle=:dash)
 plot!(z.(z_range(z1)), dA_exp(z1).(z.(z_range(z1))), label=latexstring("d_A \\, (z=$(z1))"), linestyle=:dash)
