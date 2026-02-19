@@ -41,7 +41,7 @@ const Lambda = 3 * Ω_Λ * H_0^2
 const rho_bg = 3 * Ω_m * H_0^2 / (8 * pi * G_N) / a_i^3
 
 # Numerical solution of LTB dynamics
-const r_grid = range(1e-3, r_b, length=1_000)
+const r_grid = range(1e-6, r_b, length=1_000)
 const N = length(r_grid)
 
 # Energy functions for cosmography
@@ -53,13 +53,13 @@ const Ec = Eo/c^2
 #=============================================================================#
 
 # LTB functions
-K(r) = @. ifelse(r > r_b, 0.0, -r^2 * k_max * ((r/r_b)^n - 1)^m)
-K_r(r) = @. ifelse(r > r_b, 0.0, -2*r*k_max*((r/r_b)^n - 1)^m - r*k_max*n*m*((r/r_b)^n-1)^(m-1)*(r/r_b)^n)
-K_rr(r) = @. ifelse(r > r_b, 0.0, -2*k_max*((r/r_b)^n - 1)^m - k_max*n*m*(3+n)*((r/r_b)^n - 1)^(m-1)*(r/r_b)^n - k_max*n^2*m*(m-1)*((r/r_b)^n - 1)^(m-2)*(r/r_b)^(2n))
+K(r) = ifelse(r > r_b, 0.0, -r^2 * k_max * ((r/r_b)^n - 1)^m)
+K_r(r) = ifelse(r > r_b, 0.0, -2*r*k_max*((r/r_b)^n - 1)^m - r*k_max*n*m*((r/r_b)^n-1)^(m-1)*(r/r_b)^n)
+K_rr(r) = ifelse(r > r_b, 0.0, -2*k_max*((r/r_b)^n - 1)^m - k_max*n*m*(3+n)*((r/r_b)^n - 1)^(m-1)*(r/r_b)^n - k_max*n^2*m*(m-1)*((r/r_b)^n - 1)^(m-2)*(r/r_b)^(2n))
 
-M(r) = @. 4/3 * pi * G_N * r^3 * a_i^3 * rho_bg / c^2 * (1 + 3/5 * K(r) * c^2 / (a_i*H_i*r)^2)
-M_r(r) = @. 4/3 * pi * G_N * a_i^3 * rho_bg / c^2 * (3*r^2 + 3/5 * c^2/(a_i*H_i)^2 * (K(r) + r*K_r(r)))
-M_rr(r) = @. 4/3 * pi * G_N * a_i^3 * rho_bg / c^2 * (6*r + 3/5 * c^2/(a_i*H_i)^2 * (2*K_r(r) + r*K_rr(r)))
+M(r) = 4/3 * pi * G_N * r^3 * a_i^3 * rho_bg / c^2 * (1 + 3/5 * K(r) * c^2 / (a_i*H_i*r)^2)
+M_r(r) = 4/3 * pi * G_N * a_i^3 * rho_bg / c^2 * (3*r^2 + 3/5 * c^2/(a_i*H_i)^2 * (K(r) + r*K_r(r)))
+M_rr(r) = 4/3 * pi * G_N * a_i^3 * rho_bg / c^2 * (6*r + 3/5 * c^2/(a_i*H_i)^2 * (2*K_r(r) + r*K_rr(r)))
 
 # LCDM background
 t_of_a(a) = (2/3) * (1/H_0) / sqrt(Ω_Λ) * asinh(sqrt(Ω_Λ/Ω_m) * a^(3/2))
@@ -94,7 +94,7 @@ p = (
 )
 
 # Defining the system of ODEs for A, A_r, and A_rr
-function ode!(du, u, p, t)
+function LTB_eq!(du, u, p, t)
     N = length(u) ÷ 3
     A   = @view u[1:N]
     Ar  = @view u[N+1:2N]
@@ -108,9 +108,9 @@ function ode!(du, u, p, t)
     @. dArr = ((p[8] + p[9]/A + (p[10]*Ar)/(A^2) + (p[11]*Ar^2)/(A^3) - (p[5]*Arr)/(A^2) + p[7]*Ar^2 + p[7]*A*Arr) - 2*dAr^2) / (2 * dA)
 end
 
-
-prob = ODEProblem(ode!, u0, tspan, p)
-sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12, dense=true)
+    
+prob_LTB = ODEProblem(LTB_eq!, u0, tspan, p)
+sol_LTB = solve(prob_LTB, Tsit5(), reltol=1e-12, abstol=1e-12, dense=true)
 
 # Interpolate solution for A, A_r, A_rr and their time derivatives
 #=
@@ -123,12 +123,12 @@ end
 
 # Now build the interpolated As object
 itpl = As(
-    (t,r) -> make_spatial_itp(sol(t)[1:N])(r),
-    (t,r) -> make_spatial_itp(sol(t)[N+1:2N])(r),
-    (t,r) -> make_spatial_itp(sol(t)[2N+1:end])(r),
-    (t,r) -> make_spatial_itp(sol(t, Val{1})[1:N])(r),
-    (t,r) -> make_spatial_itp(sol(t, Val{1})[N+1:2N])(r),
-    (t,r) -> make_spatial_itp(sol(t, Val{1})[2N+1:end])(r)
+    (t,r) -> make_spatial_itp(sol_LTB(t)[1:N])(r),
+    (t,r) -> make_spatial_itp(sol_LTB(t)[N+1:2N])(r),
+    (t,r) -> make_spatial_itp(sol_LTB(t)[2N+1:end])(r),
+    (t,r) -> make_spatial_itp(sol_LTB(t, Val{1})[1:N])(r),
+    (t,r) -> make_spatial_itp(sol_LTB(t, Val{1})[N+1:2N])(r),
+    (t,r) -> make_spatial_itp(sol_LTB(t, Val{1})[2N+1:end])(r)
 )
 =#
 # GEMINI INSERT START
@@ -138,24 +138,14 @@ itpl = As(
 end
 
 # 2. Dynamic, extrapolation-safe evaluator
-function fast_eval(sol, t, r, offset, is_deriv=false)
+function fast_eval(sol, t, r, offset, t_deriv=false)
     # Use your dynamically defined grid
     r_start = first(r_grid)
     r_end = last(r_grid)
     dr = step(r_grid)
     
     # Helper to grab values from the solver cleanly
-    get_val(idx) = is_deriv ? sol(t, Val{1}, idxs=idx+offset) : sol(t, idxs=idx+offset)
-
-    # Linearly extrapolate if the ray wanders outside our spatial grid
-    if r <= r_start 
-        y1, y2 = get_val(1), get_val(2)
-        return y1 + (y2 - y1) / dr * (r - r_start)
-    end
-    if r >= r_end   
-        yN_1, yN = get_val(N-1), get_val(N)
-        return yN + (yN - yN_1) / dr * (r - r_end)
-    end
+    get_val(idx) = t_deriv ? sol(t, Val{1}, idxs=idx+offset) : sol(t, idxs=idx+offset)
     
     # Find exact position on the grid
     fi = (r - r_start) / dr + 1
@@ -172,11 +162,11 @@ function fast_eval(sol, t, r, offset, is_deriv=false)
     return local_cubic(y1, y2, y3, y4, w)
 end
 
-A_intp = (t,r) -> fast_eval(sol, t, r, 0)
-A_r_intp = (t,r) -> fast_eval(sol, t, r, N)
-A_rr_intp = (t,r) -> fast_eval(sol, t, r, 2*N)
-A_t_intp = (t,r) -> fast_eval(sol, t, r, 0, true)
-A_tr_intp = (t,r) -> fast_eval(sol, t, r, N, true)
+A_intp = (t,r) -> fast_eval(sol_LTB, t, r, 0)
+A_r_intp = (t,r) -> fast_eval(sol_LTB, t, r, N)
+A_rr_intp = (t,r) -> fast_eval(sol_LTB, t, r, 2*N)
+A_t_intp = (t,r) -> fast_eval(sol_LTB, t, r, 0, true)
+A_tr_intp = (t,r) -> fast_eval(sol_LTB, t, r, N, true)
 
 # GEMINI INSERT END
 
@@ -244,22 +234,22 @@ u0 = vcat(x0, k0, D0, D_λ0)
 
 # Raytracing from lambda=0 to lambda=100
 lspan = (0, 100)
-prob = ODEProblem(geodesic_eq!, u0, lspan)
-geodes = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12, dense=true)
+prob_geo = ODEProblem(geodesic_eq!, u0, lspan)
+sol_geo = solve(prob_geo, Tsit5(), reltol=1e-12, abstol=1e-12, dense=true)
 
 # Collecting solutions
-xt(λ) = geodes(λ)[1]
-xr(λ) = geodes(λ)[2]
-xθ(λ) = geodes(λ)[3]
-xϕ(λ) = geodes(λ)[4]
+xt(λ) = sol_geo(λ)[1]
+xr(λ) = sol_geo(λ)[2]
+xθ(λ) = sol_geo(λ)[3]
+xϕ(λ) = sol_geo(λ)[4]
 
-kt(λ) = geodes(λ)[5]
-kr(λ) = geodes(λ)[6]
-kθ(λ) = geodes(λ)[7]
-kϕ(λ) = geodes(λ)[8]
+kt(λ) = sol_geo(λ)[5]
+kr(λ) = sol_geo(λ)[6]
+kθ(λ) = sol_geo(λ)[7]
+kϕ(λ) = sol_geo(λ)[8]
 
-D(λ) = reshape(geodes(λ)[9:12], 2, 2)
-D_λ(λ) = reshape(geodes(λ)[13:16], 2, 2)
+D(λ) = reshape(sol_geo(λ)[9:12], 2, 2)
+D_λ(λ) = reshape(sol_geo(λ)[13:16], 2, 2)
 
 #=============================================================================#
 # Cosmography calculations
@@ -323,8 +313,8 @@ dA_zzz(λ) = (dA(λ) / (2*(1+z(λ))^6 * Ec^3 * H(λ)^3)) * (
 )
 
 
-z_vals = z.(geodes.t)
-λ_of_z = linear_interpolation(z_vals, geodes.t, extrapolation_bc=Line())
+z_vals = z.(sol_geo.t)
+λ_of_z = linear_interpolation(z_vals, sol_geo.t, extrapolation_bc=Line())
 
 function dA_exp(z_0)
     λ_0 = λ_of_z(z_0)
@@ -340,7 +330,7 @@ end
 #=============================================================================#
 # Plotting
 #=============================================================================#
-λ_ = geodes.t[geodes.t .> 0.01]
+λ_ = sol_geo.t[sol_geo.t .> 0.01]
 z_eval = z.(λ_)
 
 pdA = plot(z_eval, dA.(λ_), 
