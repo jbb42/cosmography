@@ -7,10 +7,12 @@ using Interpolations
 using QuadGK
 using ForwardDiff
 # Plot as .tex (Tikz) files
-pgfplotsx()
-push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
-#gr()
+#pgfplotsx()
+#push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
+gr()
 default(linewidth=1, framestyle=:box, grid=true, label=nothing, legend=:topright)
+
+@time begin
 
 #=============================================================================#
 # Defining basic constants and cosmological parameters
@@ -18,34 +20,33 @@ default(linewidth=1, framestyle=:box, grid=true, label=nothing, legend=:topright
 
 # Physical constants and parameters
 # Fundamental constants
-H_0 = 71.58781594e-3   # Hubble constant [1/Gyr]
-c = 306.5926758        # Speed of light [Mpc/Gyr]
-G_N = 4.498234911e-15  # G in Mpc^3/(M_sun*Gyr^2)
+const H_0 = 71.58781594e-3   # Hubble constant [1/Gyr]
+const c = 306.5926758        # Speed of light [Mpc/Gyr]
+const G_N = 4.498234911e-15  # G in Mpc^3/(M_sun*Gyr^2)
 
 # Cosmological parameters
-Ω_Λ = 0.7
-Ω_m = 0.3
+const Ω_Λ = 0.7
+const Ω_m = 0.3
 
 # LTB parameters
-r_b = 40.0
-k_max = 5.4e-8
-n = m = 4
+const r_b = 40.0
+const k_max = 5.4e-8
+const n = 4
+const m = 4
 
 # Initial conditions
-a_i = 1/1200
-r_grid = range(1e-3, r_b, length=1_000)
+const a_i = 1/1200
+const H_i = H_0 * sqrt(Ω_m * a_i^(-3) + Ω_Λ)
+const Lambda = 3 * Ω_Λ * H_0^2
+const rho_bg = 3 * Ω_m * H_0^2 / (8 * pi * G_N) / a_i^3
 
-# LCDM background
-t_of_a(a) = (2/3) * (1/H_0) / sqrt(Ω_Λ) * asinh(sqrt(Ω_Λ/Ω_m) * a^(3/2))
-a(t) = (Ω_m/Ω_Λ)^(1/3) * sinh((3/2) * sqrt(Ω_Λ) * H_0 * t)^(2/3)
-a_t(t) = H_0 * sqrt(Ω_m/a(t) + Ω_Λ * a(t)^2)
-H_FLRW(z) = H_0 * sqrt(Ω_m * (1+z)^3 + Ω_Λ)
+# Numerical solution of LTB dynamics
+const r_grid = range(1e-3, r_b, length=1_000)
+const N = length(r_grid)
 
-t_0 = t_of_a(1.0)
-H_i = H_0 * sqrt(Ω_m * a_i^(-3) + Ω_Λ)
-t_i = t_of_a(a_i)
-Lambda = 3 * Ω_Λ * H_0^2
-rho_bg = 3 * Ω_m * H_0^2 / (8 * pi * G_N) / a_i^3
+# Energy functions for cosmography
+const Eo = -c
+const Ec = Eo/c^2
 
 #=============================================================================#
 # Setting up LTB model
@@ -60,8 +61,15 @@ M(r) = @. 4/3 * pi * G_N * r^3 * a_i^3 * rho_bg / c^2 * (1 + 3/5 * K(r) * c^2 / 
 M_r(r) = @. 4/3 * pi * G_N * a_i^3 * rho_bg / c^2 * (3*r^2 + 3/5 * c^2/(a_i*H_i)^2 * (K(r) + r*K_r(r)))
 M_rr(r) = @. 4/3 * pi * G_N * a_i^3 * rho_bg / c^2 * (6*r + 3/5 * c^2/(a_i*H_i)^2 * (2*K_r(r) + r*K_rr(r)))
 
+# LCDM background
+t_of_a(a) = (2/3) * (1/H_0) / sqrt(Ω_Λ) * asinh(sqrt(Ω_Λ/Ω_m) * a^(3/2))
+a(t) = (Ω_m/Ω_Λ)^(1/3) * sinh((3/2) * sqrt(Ω_Λ) * H_0 * t)^(2/3)
+a_t(t) = H_0 * sqrt(Ω_m/a(t) + Ω_Λ * a(t)^2)
+H_FLRW(z) = H_0 * sqrt(Ω_m * (1+z)^3 + Ω_Λ)
 
 # Numerical solution of LTB dynamics
+t_0 = t_of_a(1.0)
+t_i = t_of_a(a_i)
 tspan = (t_i, t_0)
 
 # Initial conditions
@@ -72,17 +80,17 @@ u0 = [A_i.(r_grid); A_r_i.(r_grid); A_rr_i.(r_grid)]
 
 # Parameters for ODEs
 p = (
-    -K.(r_grid) .* c^2,        # p[1]
-    2 .* M.(r_grid) .* c^2,    # p[2]
-    Lambda/3,                  # p[3]
-    2 .* M_r.(r_grid) .* c^2,  # p[4]
-    2 .* M.(r_grid) .* c^2,    # p[5]
-    -K_r.(r_grid) .* c^2,      # p[6]
-    2 * Lambda/3,              # p[7]
-    -K_rr.(r_grid) .* c^2,     # p[8]
-    2 .* M_rr.(r_grid) .* c^2, # p[9]
-    -4 .* M_r.(r_grid) .* c^2, # p[10]
-    4 .* M.(r_grid) .* c^2     # p[11]
+    -K.(r_grid) .* c^2,               # p[1]
+    2 .* M.(r_grid) .* c^2,           # p[2]
+    fill(Lambda/3, length(r_grid)),   # p[3]
+    2 .* M_r.(r_grid) .* c^2,         # p[4]
+    2 .* M.(r_grid) .* c^2,           # p[5]
+    -K_r.(r_grid) .* c^2,             # p[6]
+    fill(2*Lambda/3, length(r_grid)), # p[7]
+    -K_rr.(r_grid) .* c^2,            # p[8]
+    2 .* M_rr.(r_grid) .* c^2,        # p[9]
+    -4 .* M_r.(r_grid) .* c^2,        # p[10]
+    4 .* M.(r_grid) .* c^2            # p[11]
 )
 
 # Defining the system of ODEs for A, A_r, and A_rr
@@ -100,21 +108,12 @@ function ode!(du, u, p, t)
     @. dArr = ((p[8] + p[9]/A + (p[10]*Ar)/(A^2) + (p[11]*Ar^2)/(A^3) - (p[5]*Arr)/(A^2) + p[7]*Ar^2 + p[7]*A*Arr) - 2*dAr^2) / (2 * dA)
 end
 
+
 prob = ODEProblem(ode!, u0, tspan, p)
 sol = solve(prob, Tsit5(), reltol=1e-12, abstol=1e-12)
 
 # Interpolate solution for A, A_r, A_rr and their time derivatives
-N = length(r_grid)
-
-struct As
-    A::Function
-    A_r::Function
-    A_rr::Function
-    A_t::Function
-    A_tr::Function
-    A_trr::Function
-end
-
+#=
 # For a given time t, return a 1D cubic spline in r
 function make_spatial_itp(vec)
     # vec must be length(r_grid)
@@ -131,27 +130,72 @@ itpl = As(
     (t,r) -> make_spatial_itp(sol(t, Val{1})[N+1:2N])(r),
     (t,r) -> make_spatial_itp(sol(t, Val{1})[2N+1:end])(r)
 )
+=#
+# GEMINI INSERT START
+# 1. Local cubic curve math
+@inline function local_cubic(y1, y2, y3, y4, w)
+    return y2 + 0.5 * w * (y3 - y1 + w * (2.0*y1 - 5.0*y2 + 4.0*y3 - y4 + w * (3.0*(y2 - y3) + y4 - y1)))
+end
 
-full = As(
-    (t, r) -> (r > r_b) ? a(t)*r : itpl.A(t, r),
-    (t, r) -> (r > r_b) ? a(t) : itpl.A_r(t, r),
-    (t, r) -> (r > r_b) ? 0.0 : itpl.A_rr(t, r),
-    (t, r) -> (r > r_b) ? a_t(t)*r : itpl.A_t(t, r),
-    (t, r) -> (r > r_b) ? a_t(t) : itpl.A_tr(t, r),
-    (t, r) -> (r > r_b) ? 0.0 : itpl.A_trr(t, r)
-)
+# 2. Dynamic, extrapolation-safe evaluator
+function fast_eval(sol, t, r, offset, is_deriv=false)
+    # Use your dynamically defined grid
+    r_start = first(r_grid)
+    r_end = last(r_grid)
+    dr = step(r_grid)
+    
+    # Helper to grab values from the solver cleanly
+    get_val(idx) = is_deriv ? sol(t, Val{1}, idxs=idx+offset) : sol(t, idxs=idx+offset)
 
+    # Linearly extrapolate if the ray wanders outside our spatial grid
+    if r <= r_start 
+        y1, y2 = get_val(1), get_val(2)
+        return y1 + (y2 - y1) / dr * (r - r_start)
+    end
+    if r >= r_end   
+        yN_1, yN = get_val(N-1), get_val(N)
+        return yN + (yN - yN_1) / dr * (r - r_end)
+    end
+    
+    # Find exact position on the grid
+    fi = (r - r_start) / dr + 1
+    i = floor(Int, fi)
+    w = fi - i 
+    
+    # Extract 4 points. If we are right against the edge (i=1 or i=N-1), 
+    # we create a "ghost point" to keep the curve perfectly smooth.
+    y2 = get_val(i)
+    y3 = get_val(i+1)
+    y1 = i > 1 ? get_val(i-1) : 2.0*y2 - y3
+    y4 = i < N-1 ? get_val(i+2) : 2.0*y3 - y2
+    
+    return local_cubic(y1, y2, y3, y4, w)
+end
+
+A_intp = (t,r) -> fast_eval(sol, t, r, 0)
+A_r_intp = (t,r) -> fast_eval(sol, t, r, N)
+A_rr_intp = (t,r) -> fast_eval(sol, t, r, 2*N)
+A_t_intp = (t,r) -> fast_eval(sol, t, r, 0, true)
+A_tr_intp = (t,r) -> fast_eval(sol, t, r, N, true)
+# #GEMINI INSERT END
+
+# Direct definitions - No middle step needed
+A(t, r)   = (r > r_b) ? a(t)*r   : A_intp(t, r)
+A_r(t, r)  = (r > r_b) ? a(t)     : A_r_intp(t, r)
+A_rr(t, r) = (r > r_b) ? 0.0      : A_rr_intp(t, r)
+A_t(t, r)  = (r > r_b) ? a_t(t)*r : A_t_intp(t, r)
+A_tr(t, r) = (r > r_b) ? a_t(t)   : A_tr_intp(t, r)
 
 # LTB metric
 gtt() = -c^2
-grr(t, r) = full.A_r(t, r)^2 / (1 - K(r))
-gθθ(t, r) = full.A(t, r)^2
-gϕϕ(t, r, θ) = full.A(t, r)^2 * sin(θ)^2
+grr(t, r) = A_r(t, r)^2 / (1 - K(r))
+gθθ(t, r) = A(t, r)^2
+gϕϕ(t, r, θ) = A(t, r)^2 * sin(θ)^2
 
 # Calculate rho, theta and sigma of LTB
-ρ(t, r) = @. (c^2 / (4*pi*G_N)) * (M_r(r) / (full.A(t,r)^2 * full.A_r(t,r)))
-θ(t, r) = @. (full.A_tr(t,r)/full.A_r(t,r) + 2*full.A_t(t,r)/full.A(t,r))
-σ²(t, r) = @. (1/3) * (full.A_tr(t,r)/full.A_r(t,r) - full.A_t(t,r)/full.A(t,r))^2
+ρ(t, r) = @. (c^2 / (4*pi*G_N)) * (M_r(r) / (A(t,r)^2 * A_r(t,r)))
+θ(t, r) = @. (A_tr(t,r)/A_r(t,r) + 2*A_t(t,r)/A(t,r))
+σ²(t, r) = @. (1/3) * (A_tr(t,r)/A_r(t,r) - A_t(t,r)/A(t,r))^2
 R(t,r, kt) = (8*pi*G_N/c^4) * ρ(t,r) * kt^2 * c^4 # R = R_\mu\nu k^\mu k^\nu
 
 #=============================================================================#
@@ -160,30 +204,28 @@ R(t,r, kt) = (8*pi*G_N/c^4) * ρ(t,r) * kt^2 * c^4 # R = R_\mu\nu k^\mu k^\nu
 
 # Geodesic ray tracing
 function geodesic_eq!(du, u, p, λ)
-    x = u[1:4]   # Position: [t, r, θ, φ]
-    k = u[5:8]   # Momentum: [k_t, k_r, k_θ, k_φ]
-    D = u[9:12]  # Deviation vector
-    D_λ = u[13:16] # Deviation velocity
+    @views x = u[1:4]   # Position: [t, r, θ, φ]
+    @views k = u[5:8]   # Momentum: [k_t, k_r, k_θ, k_φ]
+    @views D = u[9:12]  # Deviation vector
+    @views D_λ = u[13:16] # Deviation velocity
 
-    A = full.A(x[1], x[2])
-    A_r = full.A_r(x[1], x[2])
-    A_rr = full.A_rr(x[1], x[2])
-    A_t = full.A_t(x[1], x[2])
-    A_tr = full.A_tr(x[1], x[2])
+    A_i = A(x[1], x[2])
+    A_r_i = A_r(x[1], x[2])
+    A_rr_i = A_rr(x[1], x[2])
+    A_t_i = A_t(x[1], x[2])
+    A_tr_i = A_tr(x[1], x[2])
 
     # Geodesic equation: dx/dλ = k
-    du[1:4] = k
+    du[1:4] .= k
 
     # dk/dλ = -Γ^μ_{αβ} k^α k^β
-    du[5] = -(A_tr*A_r)/(c^2*(1-K(x[2]))) * k[2]^2 - (A*A_t)/c^2 * k[3]^2 - (A*A_t*sin(x[3])^2)/c^2 * k[4]^2
-    du[6] = -2*(A_tr/A_r) * k[1]*k[2] - (A_rr/A_r + K_r(x[2])/(2-2*K(x[2]))) * k[2]^2 + (A/A_r)*(1-K(x[2])) * k[3]^2 + (A/A_r)*(1-K(x[2]))*sin(x[3])^2 * k[4]^2
-    du[7] = -2*(A_t/A) * k[1]*k[3] - 2*(A_r/A) * k[2]*k[3] + cos(x[3])*sin(x[3]) * k[4]^2
-    du[8] = -2*(A_t/A) * k[1]*k[4] - 2*(A_r/A) * k[2]*k[4] - 2*(cos(x[3])/sin(x[3])) * k[3]*k[4]
+    du[5] = -(A_tr_i*A_r_i)/(c^2*(1-K(x[2]))) * k[2]^2 - (A_i*A_t_i)/c^2 * k[3]^2 - (A_i*A_t_i*sin(x[3])^2)/c^2 * k[4]^2
+    du[6] = -2*(A_tr_i/A_r_i) * k[1]*k[2] - (A_rr_i/A_r_i + K_r(x[2])/(2-2*K(x[2]))) * k[2]^2 + (A_i/A_r_i)*(1-K(x[2])) * k[3]^2 + (A_i/A_r_i)*(1-K(x[2]))*sin(x[3])^2 * k[4]^2
+    du[7] = -2*(A_t_i/A_i) * k[1]*k[3] - 2*(A_r_i/A_i) * k[2]*k[3] + cos(x[3])*sin(x[3]) * k[4]^2
+    du[8] = -2*(A_t_i/A_i) * k[1]*k[4] - 2*(A_r_i/A_i) * k[2]*k[4] - 2*(cos(x[3])/sin(x[3])) * k[3]*k[4]
 
-
-    
-    du[9:12] = D_λ
-    du[13:16] = -R(x[1], x[2], k[1])/2 .* D
+    du[9:12] .= D_λ
+    du[13:16] .= -R(x[1], x[2], k[1])/2 .* D
 end
 
 # Initial conditions of light ray
@@ -229,16 +271,16 @@ dA(λ) = sqrt(D(λ)[1, 1]*D(λ)[2, 2] - D(λ)[1, 2]*D(λ)[2, 1])
 r_comoving_FLRW(z) = first(quadgk(z_ -> 1/H_FLRW(z_), 0, z))
 dA_FLRW(λ) = r_comoving_FLRW(z(λ)) * c
 
-S(λ) = D_λ(λ) / D(λ)
+S(λ) = D_λ(λ) * inv(D(λ))
 
 θ̂(λ) = (S(λ)[1, 1] .+ S(λ)[2, 2])
 
 σ̂²(λ) = (S(λ)[1, 1]^2 + S(λ)[2, 2]^2 + S(λ)[1, 2]^2 + S(λ)[2, 1]^2 - 2 * S(λ)[1, 1] * S(λ)[2, 2] + 2 * S(λ)[1, 2] * S(λ)[2, 1])/8
 
 
-σrr(t,r) = (full.A_tr(t,r)./full.A_r(t,r) .- full.A_t(t,r)./full.A(t,r)) .* 2/3*grr.(t,r)
-σθθ(t,r) = (full.A_tr(t,r)./full.A_r(t,r) .- full.A_t(t,r)./full.A(t,r)) .* (-1/3*gθθ.(t,r))
-σϕϕ(t,r,θ) = (full.A_tr(t,r)./full.A_r(t,r) .- full.A_t(t,r)./full.A(t,r)) .* (-1/3*gϕϕ.(t,r, θ))
+σrr(t,r) = (A_tr(t,r)./A_r(t,r) .- A_t(t,r)./A(t,r)) .* 2/3*grr(t,r)
+σθθ(t,r) = (A_tr(t,r)./A_r(t,r) .- A_t(t,r)./A(t,r)) .* (-1/3*gθθ(t,r))
+σϕϕ(t,r,θ) = (A_tr(t,r)./A_r(t,r) .- A_t(t,r)./A(t,r)) .* (-1/3*gϕϕ(t,r,θ))
 
 
 σ_proj(λ) = ((kr(λ) / (c * kt(λ)))^2 * σrr(xt(λ), xr(λ)) 
@@ -246,10 +288,6 @@ S(λ) = D_λ(λ) / D(λ)
     + (kϕ(λ) / (c * kt(λ)))^2 * σϕϕ(xt(λ), xr(λ), xθ(λ)))
 
 H(λ) = θ(xt(λ), xr(λ))/3 + σ_proj(λ)
-
-Eo = -c
-Ec = Eo/c^2
-
 
 #=============================================================================#
 # Derivatives of angular diameter distance
@@ -297,7 +335,6 @@ function dA_exp(z_0)
     dA_z0(z_val) = c0_z0 + c1_z0*(z_val - z_0) + c2_z0*(z_val - z_0)^2 + c3_z0*(z_val - z_0)^3
     return dA_z0
 end
-
 
 #=============================================================================#
 # Plotting
@@ -405,7 +442,7 @@ pH = plot(z.(λ_), H.(λ_),
 plot!(z.(λ_), H_FLRW.(z.(λ_)), label=L"H_\mathrm{FLRW}", linestyle=:dash)
 display(pH)
 
-z0 = 0.000
+z0 = 1e-7
 z1 = 0.006
 z2 = 0.007
 z3 = 0.008
@@ -431,3 +468,6 @@ plot!(z.(z_range(z5)), dA_exp(z5).(z.(z_range(z5))), label=latexstring("d_A \\, 
 xlims!(0, 0.01)
 ylims!(0, 42)
 display(pTaylor)
+
+
+end
