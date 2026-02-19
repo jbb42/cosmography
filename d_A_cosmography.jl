@@ -7,9 +7,9 @@ using Interpolations
 using QuadGK
 using ForwardDiff
 # Plot as .tex (Tikz) files
-#pgfplotsx()
-#push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
-gr()
+pgfplotsx()
+push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
+#gr()
 default(linewidth=1, framestyle=:box, grid=true, label=nothing, legend=:topright)
 
 #=============================================================================#
@@ -283,10 +283,26 @@ dA_zzz(λ) = (dA(λ) / (2*(1+z(λ))^6 * Ec^3 * H(λ)^3)) * (
     + Rkk_λ(λ)
 )
 
+
+z_vals = z.(geodes.t)
+λ_of_z = linear_interpolation(z_vals, geodes.t, extrapolation_bc=Line())
+
+function dA_exp(z_0)
+    λ_0 = λ_of_z(z_0)
+    c0_z0 = dA(λ_0)
+    c1_z0 = dA_z(λ_0)
+    c2_z0 = 0.5 * dA_zz(λ_0)
+    c3_z0 = (1/6) * dA_zzz(λ_0)
+
+    dA_z0(z_val) = c0_z0 + c1_z0*(z_val - z_0) + c2_z0*(z_val - z_0)^2 + c3_z0*(z_val - z_0)^3
+    return dA_z0
+end
+
+
 #=============================================================================#
 # Plotting
 #=============================================================================#
-λ_ = geodes.t[geodes.t .> 0]
+λ_ = geodes.t[geodes.t .> 0.01]
 
 pdA = plot(z.(λ_), dA.(λ_), 
     xlabel=L"z", 
@@ -388,3 +404,30 @@ pH = plot(z.(λ_), H.(λ_),
     label=L"\mathcal{H}")
 plot!(z.(λ_), H_FLRW.(z.(λ_)), label=L"H_\mathrm{FLRW}", linestyle=:dash)
 display(pH)
+
+z0 = 0.000
+z1 = 0.006
+z2 = 0.007
+z3 = 0.008
+z4 = 0.0085
+z5 = 0.009
+
+function z_range(z0, Δz=0.002)
+    z_min = z0 - Δz
+    z_max = z0 + Δz
+    return λ_of_z(z_min:0.00001:z_max)
+end
+
+pTaylor = plot(z.(λ_), dA.(λ_), label=L"d_A \, \mathrm{(LTB)}", legend=:topleft,
+    xlabel=L"z", ylabel=L"d_A \, [\mathrm{Mpc}]", title="Angular diameter distance with Taylor expansions", legendfonthalign = :left)
+plot!(z.(z_range(z0)), dA_exp(z0).(z.(z_range(z0))), label=latexstring("d_A \\, (z=$(z0))"), linestyle=:dash)
+plot!(z.(z_range(z1)), dA_exp(z1).(z.(z_range(z1))), label=latexstring("d_A \\, (z=$(z1))"), linestyle=:dash)
+plot!(z.(z_range(z2)), dA_exp(z2).(z.(z_range(z2))), label=latexstring("d_A \\, (z=$(z2))"), linestyle=:dash)
+plot!(z.(z_range(z3)), dA_exp(z3).(z.(z_range(z3))), label=latexstring("d_A \\, (z=$(z3))"), linestyle=:dash)
+plot!(z.(z_range(z4)), dA_exp(z4).(z.(z_range(z4))), label=latexstring("d_A \\, (z=$(z4))"), linestyle=:dash)
+plot!(z.(z_range(z5)), dA_exp(z5).(z.(z_range(z5))), label=latexstring("d_A \\, (z=$(z5))"), linestyle=:dash)
+#xlims!(0.004, 0.010)
+#ylims!(14, 42)
+xlims!(0, 0.01)
+ylims!(0, 42)
+display(pTaylor)
