@@ -55,13 +55,20 @@ const xϕ0 = 0.0
 
 const kt0 = -1/c
 
-Nside = 1
-xyzs = npzread("data/healpix_$(Nside).npy")
 
-for (row_num, xyz) in enumerate(eachrow(xyzs))
-    kx0, ky0, kz0 = xyz*0.1
-    println(row_num, ": kx0: $kx0, ky0: $ky0, kz0: $kz0")
-    println(kx0^2 + ky0^2 + kz0^2)
+# Healpix
+Nside = 2
+npix  = nside2npix(Nside)
+
+map = HealpixMap{Float64, NestedOrder}(Nside)
+
+theta = zeros(Float64, npix)
+phi   = zeros(Float64, npix)
+
+for i in 1:npix
+    theta_hp, phi_hp = pix2ang(map, i)
+    #theta_hp, phi_hp = pi/2, 0.0 # For testing with a single ray
+    println("Pixel $i: θ = $theta_hp, φ = $phi_hp")
 
     #=============================================================================#
     # Setting up LTB model
@@ -144,17 +151,6 @@ for (row_num, xyz) in enumerate(eachrow(xyzs))
         # Helper to grab values from the solver cleanly
         get_val(idx) = t_deriv ? sol(t, Val{1}, idxs=idx+offset) : sol(t, idxs=idx+offset)
     
-        #=
-        # Linearly extrapolate if the ray wanders outside our spatial grid
-        if r <= r_start 
-            y1, y2 = get_val(1), get_val(2)
-            return y1 + (y2 - y1) / dr * (r - r_start)
-        end
-        if r >= r_end   
-            yN_1, yN = get_val(N-1), get_val(N)
-            return yN + (yN - yN_1) / dr * (r - r_end)
-        end
-        =#
         # Find exact position on the grid
         fi = (r - r_start) / dr + 1
         i = clamp(floor(Int, fi), 1, N-1)
@@ -235,18 +231,18 @@ for (row_num, xyz) in enumerate(eachrow(xyzs))
     # Initial conditions of light ray
     x0 = [t_0, xr0, xθ0, xϕ0]
 
-    xx0 = xr0 * sin(xθ0) * cos(xϕ0)
-    xy0 = xr0 * sin(xθ0) * sin(xϕ0)
-    xz0 = xr0 * cos(xθ0)
-    xdotx = xx0^2 + xy0^2 + xz0^2
-    xnorm = sqrt(xdotx)
+    p_hat_r = sin(xθ0) * sin(theta_hp) * cos(xϕ0 - phi_hp) + cos(xθ0) * cos(theta_hp)
+    p_hat_θ = cos(xθ0) * sin(theta_hp) * cos(xϕ0 - phi_hp) - sin(xθ0) * cos(theta_hp)
+    p_hat_ϕ = sin(theta_hp) * sin(phi_hp - xϕ0)
 
-    kr0_sign = sign(xx0/xnorm * kx0 + xy0/xnorm * ky0 + xz0/xnorm * kz0)
-    println("Initial radial momentum sign: ", kr0_sign)
-    kθ0 = xx0*xz0 / (sqrt(xx0^2 + xy0^2) * xdotx) * kx0 + xy0*xz0 / (sqrt(xx0^2 + xy0^2) * xdotx) * ky0 - sqrt(xx0^2 + xy0^2)/xdotx * kz0
-    kϕ0 = -xy0/(xx0^2 + xy0^2) * kx0 + xx0/(xx0^2 + xy0^2) * ky0
-    kr0 = kr0_sign * sqrt((-gtt() * kt0^2 - gθθ(x0[1], x0[2]) * kθ0^2 - gϕϕ(x0[1], x0[2], x0[3]) * kϕ0^2) / grr(x0[1], x0[2]))
+    energy_factor = kt0 * sqrt(-gtt())
+
+    kr0 = kt0 * p_hat_r * sqrt(-gtt() / grr(x0[1], x0[2]))
+    kθ0 = kt0 * p_hat_θ * sqrt(-gtt() / gθθ(x0[1], x0[2]))
+    kϕ0 = kt0 * p_hat_ϕ * sqrt(-gtt() / gϕϕ(x0[1], x0[2], x0[3]))
+
     k0 = [kt0, kr0, kθ0, kϕ0]
+
     k0[abs.(k0) .< 1e-15] .= 0.0 # Avoid tiny nonzero values that can cause numerical issues
 
     D0 = [0.0, 0.0, 0.0, 0.0] # Flattening matrix D_0
@@ -258,9 +254,12 @@ for (row_num, xyz) in enumerate(eachrow(xyzs))
     lspan = (0, 100)
 
     # Tighter threshold so near-miss rays curve naturally without triggering
-    condition_r0(u, λ, integrator) = u[2] - 1e-6
+    condition_r0(u, λ, integrator) = u[2] - 1e-6 
 
     function affect_r0!(integrator)
+        # Move ray slightly outside problematic region to avoid numerical issues
+        #integrator.u[2] = 1e-6 + 1e-10
+        
         # Coordinate teleportation
         integrator.u[3] = π - integrator.u[3]   # θ → π - θ
         integrator.u[4] = integrator.u[4] + π   # φ → φ + π
@@ -372,7 +371,7 @@ for (row_num, xyz) in enumerate(eachrow(xyzs))
     #=============================================================================#
     λ_ = sol_geo.t[sol_geo.t .> 0.01]
     z_eval = z.(λ_)
-    #=
+
     pdA = plot(z_eval, dA.(λ_), 
         xlabel=L"z", 
         ylabel=L"d_A \, [\mathrm{Mpc}]",
@@ -473,7 +472,7 @@ for (row_num, xyz) in enumerate(eachrow(xyzs))
         label=L"\mathcal{H}")
     plot!(z_eval, H_FLRW.(z_eval), label=L"H_\mathrm{FLRW}", linestyle=:dash)
     display(pH)
-    =#
+
     z0 = 1e-7
     z1 = 0.006
     z2 = 0.007
