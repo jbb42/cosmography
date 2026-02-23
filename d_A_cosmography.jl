@@ -57,7 +57,7 @@ const kt0 = -1/c
 
 
 # Healpix
-Nside = 2
+Nside = 2 # Keep between 2^2 and 2^9 for stability.
 npix  = nside2npix(Nside)
 
 map = HealpixMap{Float64, NestedOrder}(Nside)
@@ -66,8 +66,7 @@ theta = zeros(Float64, npix)
 phi   = zeros(Float64, npix)
 
 for i in 1:npix
-    theta_hp, phi_hp = pix2ang(map, i)
-    #theta_hp, phi_hp = pi/2, 0.0 # For testing with a single ray
+    theta_hp, phi_hp = pix2ang(map, i)#(pi/2, 0)
     println("Pixel $i: θ = $theta_hp, φ = $phi_hp")
 
     #=============================================================================#
@@ -258,7 +257,7 @@ for i in 1:npix
 
     function affect_r0!(integrator)
         # Move ray slightly outside problematic region to avoid numerical issues
-        #integrator.u[2] = 1e-6 + 1e-10
+        integrator.u[2] = 1e-1 + 1e-10
         
         # Coordinate teleportation
         integrator.u[3] = π - integrator.u[3]   # θ → π - θ
