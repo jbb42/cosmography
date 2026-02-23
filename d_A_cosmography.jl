@@ -1,4 +1,4 @@
-#import Pkg; Pkg.add.(["DifferentialEquations", "Plots", "LaTeXStrings", "PGFPlotsX", "Interpolations", "QuadGK", "ForwardDiff", "NPZ"])
+#import Pkg; Pkg.add.(["DifferentialEquations", "Plots", "LaTeXStrings", "PGFPlotsX", "Interpolations", "QuadGK", "ForwardDiff", "NPZ", "Healpix"])
 using DifferentialEquations
 using Plots
 using LaTeXStrings
@@ -7,6 +7,7 @@ using Interpolations
 using QuadGK
 using ForwardDiff
 using NPZ
+using Healpix
 # Plot as .tex (Tikz) files
 #pgfplotsx()
 #push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
@@ -54,7 +55,7 @@ const xϕ0 = 0.0
 
 const kt0 = -1/c
 
-Nside = 4
+Nside = 1
 xyzs = npzread("data/healpix_$(Nside).npy")
 
 for (row_num, xyz) in enumerate(eachrow(xyzs))
@@ -241,6 +242,7 @@ for (row_num, xyz) in enumerate(eachrow(xyzs))
     xnorm = sqrt(xdotx)
 
     kr0_sign = sign(xx0/xnorm * kx0 + xy0/xnorm * ky0 + xz0/xnorm * kz0)
+    println("Initial radial momentum sign: ", kr0_sign)
     kθ0 = xx0*xz0 / (sqrt(xx0^2 + xy0^2) * xdotx) * kx0 + xy0*xz0 / (sqrt(xx0^2 + xy0^2) * xdotx) * ky0 - sqrt(xx0^2 + xy0^2)/xdotx * kz0
     kϕ0 = -xy0/(xx0^2 + xy0^2) * kx0 + xx0/(xx0^2 + xy0^2) * ky0
     kr0 = kr0_sign * sqrt((-gtt() * kt0^2 - gθθ(x0[1], x0[2]) * kθ0^2 - gϕϕ(x0[1], x0[2], x0[3]) * kϕ0^2) / grr(x0[1], x0[2]))
