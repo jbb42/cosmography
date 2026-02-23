@@ -66,7 +66,7 @@ theta = zeros(Float64, npix)
 phi   = zeros(Float64, npix)
 
 for i in 1:npix
-    theta_hp, phi_hp = pix2ang(map, i)#(pi/2, 0)
+    theta_hp, phi_hp = pix2ang(map, i)
     println("Pixel $i: θ = $theta_hp, φ = $phi_hp")
 
     #=============================================================================#
@@ -253,12 +253,9 @@ for i in 1:npix
     lspan = (0, 100)
 
     # Tighter threshold so near-miss rays curve naturally without triggering
-    condition_r0(u, λ, integrator) = u[2] - 1e-6 
+    condition_r0(u, λ, integrator) = u[2] - 1e-15
 
     function affect_r0!(integrator)
-        # Move ray slightly outside problematic region to avoid numerical issues
-        integrator.u[2] = 1e-1 + 1e-10
-        
         # Coordinate teleportation
         integrator.u[3] = π - integrator.u[3]   # θ → π - θ
         integrator.u[4] = integrator.u[4] + π   # φ → φ + π
@@ -270,7 +267,7 @@ for i in 1:npix
     end
 
     # Correct argument order: affect_r0! for inward falling (+ to -), nothing for outward (- to +)
-    cb_r0 = ContinuousCallback(condition_r0, affect_r0!, nothing)
+    cb_r0 = ContinuousCallback(condition_r0, nothing, affect_r0!)
 
     prob_geo = ODEProblem(geodesic_eq!, u0, lspan, callback=cb_r0)
     sol_geo = solve(prob_geo, Tsit5(), reltol=1e-12, abstol=1e-12, dense=true)
