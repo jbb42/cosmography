@@ -51,23 +51,24 @@ const Ec = Eo/c^2
 # Initial conditions for ray tracing
 const xr0 = 0.1
 const xθ0 = pi/2
-const xϕ0 = 0.0
+const xϕ0 = 0
 
 const kt0 = -1/c
 
 
 # Healpix
-Nside = 2 # Keep between 2^2 and 2^9 for stability.
+Nside = 16
 npix  = nside2npix(Nside)
 
-map = HealpixMap{Float64, NestedOrder}(Nside)
+#map = HealpixMap{Float64, NestedOrder}(Nside)
 
-theta = zeros(Float64, npix)
-phi   = zeros(Float64, npix)
+# Bind them to HealpixMap objects
+map_008 = HealpixMap{Float64, NestedOrder}(Nside)
+map_009 = HealpixMap{Float64, NestedOrder}(Nside)
 
-for i in 1:npix
-    theta_hp, phi_hp = pix2ang(map, i)
-    println("Pixel $i: θ = $theta_hp, φ = $phi_hp")
+for pixel in 1:npix
+    theta_hp, phi_hp = pix2ang(map_008, pixel)
+    println("Pixel $pixel: θ = $theta_hp, φ = $phi_hp")
 
     #=============================================================================#
     # Setting up LTB model
@@ -367,7 +368,7 @@ for i in 1:npix
     #=============================================================================#
     λ_ = sol_geo.t[sol_geo.t .> 0.01]
     z_eval = z.(λ_)
-
+#=
     pdA = plot(z_eval, dA.(λ_), 
         xlabel=L"z", 
         ylabel=L"d_A \, [\mathrm{Mpc}]",
@@ -496,4 +497,11 @@ for i in 1:npix
     ylims!(0, 42)
     display(pTaylor)
 
+=#
+
+    println("d_A(z=0.008) = ", dA(λ_of_z(0.008)), " at pixel ", pixel)
+    map_008.pixels[pixel] = dA(λ_of_z(0.008))
 end
+
+hpplot = plot(map_008, Healpix.mollweide, title="d_A at z = 0.008", color=:viridis, framestyle=:none)
+display(hpplot)
