@@ -8,6 +8,7 @@ using QuadGK
 using ForwardDiff
 using NPZ
 using Healpix
+using Base.Threads
 # Plot as .tex (Tikz) files
 #pgfplotsx()
 #push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
@@ -57,17 +58,15 @@ const kt0 = -1/c
 
 
 # Healpix
-Nside = 16
+Nside = 64
 npix  = nside2npix(Nside)
 
-#map = HealpixMap{Float64, NestedOrder}(Nside)
+map = HealpixMap{Float64, NestedOrder}(Nside)
 
-# Bind them to HealpixMap objects
-map_008 = HealpixMap{Float64, NestedOrder}(Nside)
-map_009 = HealpixMap{Float64, NestedOrder}(Nside)
 
-for pixel in 1:npix
-    theta_hp, phi_hp = pix2ang(map_008, pixel)
+
+Threads.@threads for pixel in 1:npix
+    theta_hp, phi_hp = pix2ang(map, pixel)
     println("Pixel $pixel: θ = $theta_hp, φ = $phi_hp")
 
     #=============================================================================#
@@ -496,12 +495,27 @@ for pixel in 1:npix
     xlims!(0, 0.01)
     ylims!(0, 42)
     display(pTaylor)
-
 =#
 
-    println("d_A(z=0.008) = ", dA(λ_of_z(0.008)), " at pixel ", pixel)
-    map_008.pixels[pixel] = dA(λ_of_z(0.008))
-end
+    z_range = collect(range(0, step=1e-5, stop=0.012))
+    z_range[1] = 1e-7
 
-hpplot = plot(map_008, Healpix.mollweide, title="d_A at z = 0.008", color=:viridis, framestyle=:none)
-display(hpplot)
+    npzwrite("data/pixels44/dA_pixel_$pixel.npz",
+        z_range = z_range,
+        dA = dA.(λ_of_z(z_range)),
+        dA_exp_000 = dA_exp(1e-7).(z_range),
+        dA_exp_001 = dA_exp(0.001).(z_range),
+        dA_exp_002 = dA_exp(0.002).(z_range),
+        dA_exp_003 = dA_exp(0.003).(z_range),
+        dA_exp_004 = dA_exp(0.004).(z_range),
+        dA_exp_005 = dA_exp(0.005).(z_range),
+        dA_exp_006 = dA_exp(0.006).(z_range),
+        dA_exp_007 = dA_exp(0.007).(z_range),
+        dA_exp_008 = dA_exp(0.008).(z_range),
+        dA_exp_009 = dA_exp(0.009).(z_range),
+        dA_exp_010 = dA_exp(0.010).(z_range),
+        dA_exp_011 = dA_exp(0.011).(z_range),
+        dA_exp_012 = dA_exp(0.012).(z_range)
+    )
+
+end
