@@ -50,7 +50,7 @@ const Eo = -c
 const Ec = Eo/c^2
 
 # Initial conditions for ray tracing
-const xr0 = 0.1
+const xr0 = 20.0#0.1
 const xθ0 = pi/2
 const xϕ0 = 0
 
@@ -58,7 +58,7 @@ const kt0 = -1/c
 
 
 # Healpix
-Nside = 64
+Nside = 32
 npix  = nside2npix(Nside)
 
 map = HealpixMap{Float64, NestedOrder}(Nside)
@@ -497,25 +497,28 @@ Threads.@threads for pixel in 1:npix
     display(pTaylor)
 =#
 
-    z_range = collect(range(0, step=1e-5, stop=0.012))
+    z_range = collect(range(0, step=1e-5, stop=0.020))
     z_range[1] = 1e-7
 
-    npzwrite("data/pixels44/dA_pixel_$pixel.npz",
+    npzwrite("data/pixels_exp/dA_pixel_$pixel.npz",
         z_range = z_range,
         dA = dA.(λ_of_z(z_range)),
-        dA_exp_000 = dA_exp(1e-7).(z_range),
-        dA_exp_001 = dA_exp(0.001).(z_range),
-        dA_exp_002 = dA_exp(0.002).(z_range),
-        dA_exp_003 = dA_exp(0.003).(z_range),
-        dA_exp_004 = dA_exp(0.004).(z_range),
-        dA_exp_005 = dA_exp(0.005).(z_range),
-        dA_exp_006 = dA_exp(0.006).(z_range),
-        dA_exp_007 = dA_exp(0.007).(z_range),
-        dA_exp_008 = dA_exp(0.008).(z_range),
-        dA_exp_009 = dA_exp(0.009).(z_range),
-        dA_exp_010 = dA_exp(0.010).(z_range),
-        dA_exp_011 = dA_exp(0.011).(z_range),
-        dA_exp_012 = dA_exp(0.012).(z_range)
+        dA_z = dA_z.(λ_of_z(z_range)),
+        dA_zz = dA_zz.(λ_of_z(z_range)),
+        dA_zzz = dA_zzz.(λ_of_z(z_range))
+        #dA_exp_000 = dA_exp(1e-7).(z_range),
+        #dA_exp_001 = dA_exp(0.001).(z_range),
+        #dA_exp_002 = dA_exp(0.002).(z_range),
+        #dA_exp_003 = dA_exp(0.003).(z_range),
+        #dA_exp_004 = dA_exp(0.004).(z_range),
+        #dA_exp_005 = dA_exp(0.005).(z_range),
+        #dA_exp_006 = dA_exp(0.006).(z_range),
+        #dA_exp_007 = dA_exp(0.007).(z_range),
+        #dA_exp_008 = dA_exp(0.008).(z_range),
+        #dA_exp_009 = dA_exp(0.009).(z_range),
+        #dA_exp_010 = dA_exp(0.010).(z_range),
+        #dA_exp_011 = dA_exp(0.011).(z_range),
+        #dA_exp_012 = dA_exp(0.012).(z_range)
     )
 
 end
