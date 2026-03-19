@@ -58,7 +58,7 @@ const kt0 = -1/c
 
 
 # Healpix
-Nside = 32
+Nside = 64
 npix  = nside2npix(Nside)
 
 map = HealpixMap{Float64, NestedOrder}(Nside)
