@@ -42,11 +42,11 @@ push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
 # 325pt width fits exactly 2 across on a 650pt page with no gap
 Plots.default(
     fontfamily = "Computer Modern",
-    titlefont  = font(12, "Computer Modern"), # Forces title to match Makie titlesize
-    guidefont  = font(12, "Computer Modern"), # Matches Makie labelsize
-    tickfont   = font(10, "Computer Modern"), # Matches Makie ticklabelsize
-    legendfont = font(10, "Computer Modern"), 
-    size       = (325, 216),  
+    titlefont  = font(10, "Computer Modern"), # Forces title to match Makie titlesize
+    guidefont  = font(10, "Computer Modern"), # Matches Makie labelsize
+    tickfont   = font(8, "Computer Modern"), # Matches Makie ticklabelsize
+    legendfont = font(8, "Computer Modern"), 
+    size       = (320, 220),  
     linewidth  = 1,         
     legend     = :topleft     
 )
