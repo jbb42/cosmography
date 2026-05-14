@@ -50,12 +50,16 @@ const Eo = -c
 const Ec = Eo/c^2
 
 # Initial conditions for ray tracing
-const xr0 = 20.0#0.1
+const xr0 = 20.0# 20 for void, 10 for diov#10.0 #0.1
 const xθ0 = pi/2
 const xϕ0 = 0
 
 const kt0 = -1/c
 
+const r_σ = 7.0
+const δ_0 = 1e-3  # Your new "small" amplitude parameter
+const M_bg_coeff = 4/3 * pi * G_N * a_i^3 * rho_bg / c^2
+const k_0 = 5/3 * (a_i * H_i / c)^2
 
 # Healpix
 Nside = 64
@@ -81,7 +85,21 @@ Threads.@threads for pixel in 1:npix
     M(r) = 4/3 * pi * G_N * r^3 * a_i^3 * rho_bg / c^2 * (1 + 3/5 * K(r) * c^2 / (a_i*H_i*r)^2)
     M_r(r) = 4/3 * pi * G_N * a_i^3 * rho_bg / c^2 * (3*r^2 + 3/5 * c^2/(a_i*H_i)^2 * (K(r) + r*K_r(r)))
     M_rr(r) = 4/3 * pi * G_N * a_i^3 * rho_bg / c^2 * (6*r + 3/5 * c^2/(a_i*H_i)^2 * (2*K_r(r) + r*K_rr(r)))
+#=
+    # DIOV
+    # The Gaussian density perturbation
+    δ(r) = δ_0 * exp(-r^2 / (2 * r_σ^2))
 
+    # M(r) and its analytical derivatives
+    M(r)    = M_bg_coeff * r^3 * (1 + δ(r))
+    M_r(r)  = M_bg_coeff * r^2 * (3 + δ(r) * (3 - (r/r_σ)^2))
+    M_rr(r) = M_bg_coeff * r * (6 + δ(r) * (6 - 7*(r/r_σ)^2 + (r/r_σ)^4))
+
+    # K(r) and its analytical derivatives
+    K(r)    = k_0 * r^2 * δ(r)
+    K_r(r)  = k_0 * r * δ(r) * (2 - (r/r_σ)^2)
+    K_rr(r) = k_0 * δ(r) * (2 - 5*(r/r_σ)^2 + (r/r_σ)^4)
+=#
     # LCDM background
     t_of_a(a) = (2/3) * (1/H_0) / sqrt(Ω_Λ) * asinh(sqrt(Ω_Λ/Ω_m) * a^(3/2))
     a(t) = (Ω_m/Ω_Λ)^(1/3) * cbrt(sinh((3/2) * sqrt(Ω_Λ) * H_0 * t))^2
@@ -301,7 +319,7 @@ Threads.@threads for pixel in 1:npix
 
     θ̂(λ) = (S(λ)[1, 1] .+ S(λ)[2, 2])
 
-    σ̂²(λ) = (S(λ)[1, 1]^2 + S(λ)[2, 2]^2 + S(λ)[1, 2]^2 + S(λ)[2, 1]^2 - 2 * S(λ)[1, 1] * S(λ)[2, 2] + 2 * S(λ)[1, 2] * S(λ)[2, 1])/8
+    σ̂²(λ) = (S(λ)[1, 1]^2 + S(λ)[2, 2]^2 + S(λ)[1, 2]^2 + S(λ)[2, 1]^2 - 2 * S(λ)[1, 1] * S(λ)[2, 2] + 2 * S(λ)[1, 2] * S(λ)[2, 1])/4
 
 
     σrr(t,r) = (A_tr(t,r)./A_r(t,r) .- A_t(t,r)./A(t,r)) .* 2/3*grr(t,r)
@@ -500,7 +518,7 @@ Threads.@threads for pixel in 1:npix
     z_range = collect(range(0, step=1e-5, stop=0.020))
     z_range[1] = 1e-7
 
-    npzwrite("data/pixels_exp/dA_pixel_$pixel.npz",
+    npzwrite("data/pixels_void_offcentre_10/dA_pixel_$pixel.npz",
         z_range = z_range,
         dA = dA.(λ_of_z(z_range)),
         dA_z = dA_z.(λ_of_z(z_range)),
