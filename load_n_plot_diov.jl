@@ -12,7 +12,7 @@ using Statistics
 using PlotUtils
 using ForwardDiff
 using QuadGK
-
+using Plots.Measures
 
 # =============================================================================
 # Configuration & Constants
@@ -46,7 +46,7 @@ Plots.default(
     guidefont  = font(10, "Computer Modern"), # Matches Makie labelsize
     tickfont   = font(8, "Computer Modern"), # Matches Makie ticklabelsize
     legendfont = font(8, "Computer Modern"), 
-    size       = (320, 220),  
+    size       = (320, 375),  
     linewidth  = 1,         
     legend     = :topleft     
 )
@@ -134,27 +134,39 @@ Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.004, z_range, dA_exact, dA_z_exact, d
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.006, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.006", ls=:dashdotdot, color=line_colors[5])
 Plots.xlabel!(p1, L"z")
 Plots.ylabel!(p1, L"d_A")
-Plots.title!(p1, L"d_A \ \mathrm{and \ expansion \ for \ fiducial \ light \ ray}")
-Plots.xlims!(p1, 0, 0.006)
-Plots.ylims!(p1, 0, 25)
-Plots.savefig(p1, joinpath(BASE_PLOT_DIR, "fiducial_ray.pdf"))
-Plots.savefig(p1, joinpath(BASE_PLOT_DIR, "fiducial_ray.tex"))
+Plots.title!(p1, L"d_A \text{ exact vs expansion (fiducial ray, LTB2)}")
+Plots.xlims!(p1, 0, 0.008)
+Plots.ylims!(p1, 0, 34)
+#Plots.savefig(p1, joinpath(BASE_PLOT_DIR, "fiducial_ray.pdf"))
+#Plots.savefig(p1, joinpath(BASE_PLOT_DIR, "fiducial_ray.tex"))
+Plots.plot!(p1, xlabel="", xticks=:none, bottom_margin=-5mm)
 
 dA_exact_safe = copy(dA_exact)
 dA_exact_safe[dA_exact_safe .== 0] .= 1e-10 
 
-p2 = Plots.plot(z_range, pgf_safe(dA_exact ./ dA_exact_safe, limit=100.0), label="Exact", color=line_colors[1], legend=:bottomright)
+p2 = Plots.plot(z_range, pgf_safe(dA_exact ./ dA_exact_safe, limit=100.0), label="Exact", color=line_colors[1], legend=:none)
 Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.000, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.000", ls=:dash, color=line_colors[2])
 Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.002, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.002", ls=:dot, color=line_colors[3])
 Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.004, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.004", ls=:dashdot, color=line_colors[4])
 Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.006, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.006", ls=:dashdotdot, color=line_colors[5])
 Plots.xlabel!(p2, L"z")
 Plots.ylabel!(p2, L"d_A/d_{A,\mathrm{exact}}")
-Plots.title!(p2, L"d_A \ \mathrm{and \ expansion \ for \ fiducial \ light \ ray}")
-Plots.xlims!(p2, 0, 0.006)
-Plots.ylims!(p2, -2, 4)
-Plots.savefig(p2, joinpath(BASE_PLOT_DIR, "fiducial_ray_norm.pdf"))
-Plots.savefig(p2, joinpath(BASE_PLOT_DIR, "fiducial_ray_norm.tex"))
+#Plots.title!(p2, L"d_A \ \mathrm{and \ expansion \ for \ fiducial \ light \ ray}")
+Plots.xlims!(p2, 0, 0.008)
+Plots.ylims!(p2, -1, 3)
+#Plots.savefig(p2, joinpath(BASE_PLOT_DIR, "fiducial_ray_norm.pdf"))
+#Plots.savefig(p2, joinpath(BASE_PLOT_DIR, "fiducial_ray_norm.tex"))
+Plots.plot!(p2, top_margin=-5mm)
+
+# Combine p1 and p2, making p2 half the height of p1
+p_combined = Plots.plot(p1, p2, 
+    layout = grid(2, 1, heights=[2/3, 1/3]),
+    link = :x 
+)
+
+
+Plots.savefig(p_combined, joinpath(BASE_PLOT_DIR, "fiducial_ray_combined.pdf"))
+Plots.savefig(p_combined, joinpath(BASE_PLOT_DIR, "fiducial_ray_combined.tex"))
 
 # =============================================================================
 # Sky Maps (CairoMakie) - Scaled for 5 side-by-side (130pt rendered width)
@@ -309,7 +321,7 @@ for gap in [1, 2, 4]
     p3 = Plots.plot(z_range, pgf_safe(mean_err, limit=10.0), label=L"\mathrm{Mean}", left_margin = 3Plots.mm, color=line_colors[1], legend=:bottomright)
     Plots.plot!(p3, z_range, pgf_safe(mean_err .+ std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} + 1\sigma", color=line_colors[2])
     Plots.plot!(p3, z_range, pgf_safe(mean_err .- std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} - 1\sigma", color=line_colors[3])
-    Plots.xlims!(p3, 0, 0.01)
+    Plots.xlims!(p3, 0, 0.008)
     Plots.ylims!(p3, -.01, .01)
     Plots.xlabel!(p3, "z")
     Plots.ylabel!(p3, L"\frac{d_A - d_{A,\mathrm{expansion}}}{d_A}")
