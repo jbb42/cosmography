@@ -42,11 +42,11 @@ push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
 # 325pt width fits exactly 2 across on a 650pt page with no gap
 Plots.default(
     fontfamily = "Computer Modern",
-    titlefont  = font(10, "Computer Modern"), # Forces title to match Makie titlesize
-    guidefont  = font(10, "Computer Modern"), # Matches Makie labelsize
-    tickfont   = font(8, "Computer Modern"), # Matches Makie ticklabelsize
-    legendfont = font(8, "Computer Modern"), 
-    size       = (320, 250),  
+    titlefont  = font(11, "Computer Modern"), # Forces title to match Makie titlesize
+    guidefont  = font(11, "Computer Modern"), # Matches Makie labelsize
+    tickfont   = font(10, "Computer Modern"), # Matches Makie ticklabelsize
+    legendfont = font(10, "Computer Modern"), 
+    size       = (320, 375),  
     linewidth  = 1,         
     legend     = :topleft     
 )
@@ -133,7 +133,7 @@ Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.005, z_range, dA_exact, dA_z_exact, d
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.010, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.010", ls=:dashdot, color=line_colors[4])
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.015, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.015", ls=:dashdotdot, color=line_colors[5])
 Plots.ylabel!(p1, L"d_A")
-Plots.title!(p1, L"d_A \text{ exact vs expansion (fiducial ray, LTB2)}")
+Plots.title!(p1, L"d_A \text{ exact vs expansion (fiducial ray, LTB1)}")
 Plots.xlims!(p1, 0, 0.020)
 Plots.ylims!(p1, 0, 80)
 # Remove x-ticks and reduce bottom margin
