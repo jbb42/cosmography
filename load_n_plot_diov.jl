@@ -42,10 +42,10 @@ push!(PGFPlotsX.CUSTOM_PREAMBLE, "\\usepackage{amsmath}")
 # 325pt width fits exactly 2 across on a 650pt page with no gap
 Plots.default(
     fontfamily = "Computer Modern",
-    titlefont  = font(10, "Computer Modern"), # Forces title to match Makie titlesize
-    guidefont  = font(10, "Computer Modern"), # Matches Makie labelsize
-    tickfont   = font(8, "Computer Modern"), # Matches Makie ticklabelsize
-    legendfont = font(8, "Computer Modern"), 
+    titlefont  = font(11, "Computer Modern"), # Forces title to match Makie titlesize
+    guidefont  = font(11, "Computer Modern"), # Matches Makie labelsize
+    tickfont   = font(10, "Computer Modern"), # Matches Makie ticklabelsize
+    legendfont = font(10, "Computer Modern"), 
     size       = (315, 375),  
     linewidth  = 1,         
     legend     = :topleft     
@@ -325,14 +325,14 @@ for gap in [1, 2, 4]
     mean_err  = mean(rel_error, dims=1)[:]
     std_err   = std(rel_error, dims=1)[:] 
 
-    p3 = Plots.plot(z_range, pgf_safe(mean_err, limit=10.0), label=L"\mathrm{Mean}", left_margin = 3Plots.mm, color=line_colors[1], legend=:topright, size=(320, 300))
+    p3 = Plots.plot(z_range, pgf_safe(mean_err, limit=10.0), label=L"\mathrm{Mean}", left_margin = 3Plots.mm, color=line_colors[1], legend=:topright, size=(315, 270))
     Plots.plot!(p3, z_range, pgf_safe(mean_err .+ std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} + 1\sigma", color=line_colors[2])
     Plots.plot!(p3, z_range, pgf_safe(mean_err .- std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} - 1\sigma", color=line_colors[3])
     Plots.xlims!(p3, 0, 0.008)
     Plots.ylims!(p3, -2*maximum(abs.(mean_err)), 2*maximum(abs.(mean_err)))
     Plots.xlabel!(p3, "z")
-    Plots.ylabel!(p3, L"\frac{d_A - d_{A,\mathrm{expansion}}}{d_A}")
-    Plots.title!(p3, "Relative error of expansion ($(Int(20 / gap + 1)) redshifts)")
+    Plots.ylabel!(p3, L"(d_A - d_{A,\mathrm{exp}}) / d_A")
+    Plots.title!(p3, "Relative error LTB2 ($(Int(20 / gap + 1)) redshifts)")
     Plots.savefig(p3, joinpath(BASE_PLOT_DIR, "relative_error$(Int(20 / gap + 1)).pdf"))
     Plots.savefig(p3, joinpath(BASE_PLOT_DIR, "relative_error$(Int(20 / gap + 1)).tex"))
 end
