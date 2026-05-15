@@ -46,7 +46,7 @@ Plots.default(
     guidefont  = font(11, "Computer Modern"), # Matches Makie labelsize
     tickfont   = font(10, "Computer Modern"), # Matches Makie ticklabelsize
     legendfont = font(10, "Computer Modern"), 
-    size       = (320, 375),  
+    size       = (315, 375),  
     linewidth  = 1,         
     legend     = :topleft     
 )
@@ -122,12 +122,33 @@ dA_z_exact   = dA_z_map[1000, :]
 dA_zz_exact  = dA_zz_map[1000, :]
 dA_zzz_exact = dA_zzz_map[1000, :]
 
+# Calculate FLRW limit
+H_FLRW(z) = H_0 * sqrt(Ω_m * (1 + z)^3 + Ω_Λ)
+dHdz_FLRW(z) = (3/2) * H_0^2 * Ω_m * (1 + z)^2 / H_FLRW(z)
+d2Hdz2_FLRW(z) = 3 * H_0^2 * Ω_m * (1 + z) / H_FLRW(z) - dHdz_FLRW(z)^2 / H_FLRW(z)
+
+dA_FLRW(z) = z < 1e-12 ? 0.0 : quadgk(zp -> c / H_FLRW(zp), 0.0, z)[1] / (1 + z)
+
+ddA_FLRW(z) = (c / H_FLRW(z) - dA_FLRW(z)) / (1 + z)
+
+d2dA_FLRW(z) = (-c / H_FLRW(z) + dA_FLRW(z)) / (1 + z)^2 +
+    (-c * dHdz_FLRW(z) / H_FLRW(z)^2 - ddA_FLRW(z)) / (1 + z)
+
+d3dA_FLRW(z) =
+    2 * (c / H_FLRW(z) - dA_FLRW(z)) / (1 + z)^3 +
+    2 * (c * dHdz_FLRW(z) / H_FLRW(z)^2 + ddA_FLRW(z)) / (1 + z)^2 -
+    (c * (d2Hdz2_FLRW(z) / H_FLRW(z)^2 - 2 * dHdz_FLRW(z)^2 / H_FLRW(z)^3) + d2dA_FLRW(z)) / (1 + z)
+
+
 # =============================================================================
 # 1D Plots (PGFPlotsX Backend)
 # =============================================================================
 println("Generating 1D plots...")
 
+dA_flrw_arr = dA_FLRW.(z_range)
+
 p1 = Plots.plot(z_range, pgf_safe(dA_exact), label="Exact", color=line_colors[1], legend=:bottomright)
+Plots.plot!(p1, z_range, pgf_safe(dA_flrw_arr), label=L"\text{FLRW}", color=:black, ls=:dash, alpha=0.5)
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.000, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.000", ls=:dash, color=line_colors[2])
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.005, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.005", ls=:dot, color=line_colors[3])
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.010, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.010", ls=:dashdot, color=line_colors[4])
@@ -144,6 +165,7 @@ dA_exact_safe[dA_exact_safe .== 0] .= 1e-10
 
 # Removed the legend here to avoid duplication, matching your successful template
 p2 = Plots.plot(z_range, pgf_safe(dA_exact ./ dA_exact_safe, limit=100.0), label="Exact", color=line_colors[1], legend=:none)
+Plots.plot!(p2, z_range, pgf_safe(dA_flrw_arr ./ dA_exact_safe, limit=100.0), label=L"\text{FLRW}", color=:black, ls=:dash, alpha=0.5)
 Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.000, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.000", ls=:dash, color=line_colors[2])
 Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.005, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.005", ls=:dot, color=line_colors[3])
 Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.010, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.010", ls=:dashdot, color=line_colors[4])
@@ -168,23 +190,6 @@ Plots.savefig(p_combined, joinpath(BASE_PLOT_DIR, "fiducial_ray_combined.tex"))
 # Sky Maps (CairoMakie) - Scaled for 5 side-by-side (130pt rendered width)
 # =============================================================================
 println("Generating Sky Maps (Organized into subfolders)...")
-
-# Calculate FLRW limit
-H_FLRW(z) = H_0 * sqrt(Ω_m * (1 + z)^3 + Ω_Λ)
-dHdz_FLRW(z) = (3/2) * H_0^2 * Ω_m * (1 + z)^2 / H_FLRW(z)
-d2Hdz2_FLRW(z) = 3 * H_0^2 * Ω_m * (1 + z) / H_FLRW(z) - dHdz_FLRW(z)^2 / H_FLRW(z)
-
-dA_FLRW(z) = z < 1e-12 ? 0.0 : quadgk(zp -> c / H_FLRW(zp), 0.0, z)[1] / (1 + z)
-
-ddA_FLRW(z) = (c / H_FLRW(z) - dA_FLRW(z)) / (1 + z)
-
-d2dA_FLRW(z) = (-c / H_FLRW(z) + dA_FLRW(z)) / (1 + z)^2 +
-    (-c * dHdz_FLRW(z) / H_FLRW(z)^2 - ddA_FLRW(z)) / (1 + z)
-
-d3dA_FLRW(z) =
-    2 * (c / H_FLRW(z) - dA_FLRW(z)) / (1 + z)^3 +
-    2 * (c * dHdz_FLRW(z) / H_FLRW(z)^2 + ddA_FLRW(z)) / (1 + z)^2 -
-    (c * (d2Hdz2_FLRW(z) / H_FLRW(z)^2 - 2 * dHdz_FLRW(z)^2 / H_FLRW(z)^3) + d2dA_FLRW(z)) / (1 + z)
 
 function plot_sky(out_dir, file_prefix, title_tex, z_val, map_data)
     str_z = @sprintf("%.3f", z_val)
@@ -318,7 +323,7 @@ for gap in [1, 2, 4]
     Plots.plot!(p3, z_range, pgf_safe(mean_err .+ std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} + 1\sigma", color=line_colors[2])
     Plots.plot!(p3, z_range, pgf_safe(mean_err .- std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} - 1\sigma", color=line_colors[3])
 
-    Plots.ylims!(p3, -.1, .1)
+    Plots.ylims!(p3, -2*maximum(abs.(mean_err)), 2*maximum(abs.(mean_err)))
     Plots.xlabel!(p3, "z")
     Plots.ylabel!(p3, L"\frac{d_A - d_{A,\mathrm{expansion}}}{d_A}")
     Plots.title!(p3, "Relative error of expansion ($(Int(20 / gap + 1)) redshifts)")
