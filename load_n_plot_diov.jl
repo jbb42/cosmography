@@ -301,10 +301,12 @@ println("Calculating Relative Error Distributions...")
 full_map = zeros(Float64, NPIX, nz)
 
 for gap in [1, 2, 4]
+    dz = 0.0004 * gap
     for (i, z) in enumerate(z_range)
-        bin = floor(Int, (z + 0.0005*gap) / (0.001*gap))
+        bin = floor(Int, (z + dz/2) / dz)
         iz0 = 1 + gap * 100 * bin
-        iz0 = min(iz0, nz) 
+        iz0 = min(iz0, nz)
+
         full_map[:, i] = dA_exp_fixed(z, iz0, z_range, dA_map, dA_z_map, dA_zz_map, dA_zzz_map)
     end
 
@@ -318,11 +320,11 @@ for gap in [1, 2, 4]
     mean_err  = mean(rel_error, dims=1)[:]
     std_err   = std(rel_error, dims=1)[:] 
 
-    p3 = Plots.plot(z_range, pgf_safe(mean_err, limit=10.0), label=L"\mathrm{Mean}", left_margin = 3Plots.mm, color=line_colors[1], legend=:bottomright)
+    p3 = Plots.plot(z_range, pgf_safe(mean_err, limit=10.0), label=L"\mathrm{Mean}", left_margin = 3Plots.mm, color=line_colors[1], legend=:topright, size=(320, 300))
     Plots.plot!(p3, z_range, pgf_safe(mean_err .+ std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} + 1\sigma", color=line_colors[2])
     Plots.plot!(p3, z_range, pgf_safe(mean_err .- std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} - 1\sigma", color=line_colors[3])
     Plots.xlims!(p3, 0, 0.008)
-    Plots.ylims!(p3, -.01, .01)
+    Plots.ylims!(p3, -.1, .1)
     Plots.xlabel!(p3, "z")
     Plots.ylabel!(p3, L"\frac{d_A - d_{A,\mathrm{expansion}}}{d_A}")
     Plots.title!(p3, "Relative error of expansion ($(Int(20 / gap + 1)) redshifts)")

@@ -314,7 +314,7 @@ for gap in [1, 2, 4]
     mean_err  = mean(rel_error, dims=1)[:]
     std_err   = std(rel_error, dims=1)[:] 
 
-    p3 = Plots.plot(z_range, pgf_safe(mean_err, limit=10.0), label=L"\mathrm{Mean}", left_margin = 3Plots.mm, color=line_colors[1])
+    p3 = Plots.plot(z_range, pgf_safe(mean_err, limit=10.0), label=L"\mathrm{Mean}", left_margin = 3Plots.mm, color=line_colors[1], legend=:topright, size=(320, 300))
     Plots.plot!(p3, z_range, pgf_safe(mean_err .+ std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} + 1\sigma", color=line_colors[2])
     Plots.plot!(p3, z_range, pgf_safe(mean_err .- std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} - 1\sigma", color=line_colors[3])
 
