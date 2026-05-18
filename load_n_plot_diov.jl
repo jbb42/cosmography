@@ -152,31 +152,28 @@ Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.000, z_range, dA_exact, dA_z_exact, d
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.002, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.002", ls=:dot, color=line_colors[3])
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.004, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.004", ls=:dashdot, color=line_colors[4])
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.006, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.006", ls=:dashdotdot, color=line_colors[5])
-Plots.xlabel!(p1, L"z")
 Plots.ylabel!(p1, L"d_A")
 Plots.title!(p1, L"d_A \text{ exact vs expansion (fiducial ray, LTB2)}")
 Plots.xlims!(p1, 0, 0.008)
 Plots.ylims!(p1, 0, 34)
-#Plots.savefig(p1, joinpath(BASE_PLOT_DIR, "fiducial_ray.pdf"))
-#Plots.savefig(p1, joinpath(BASE_PLOT_DIR, "fiducial_ray.tex"))
+# Remove x-ticks and reduce bottom margin
 Plots.plot!(p1, xlabel="", xticks=:none, bottom_margin=-5mm)
 
 dA_exact_safe = copy(dA_exact)
 dA_exact_safe[dA_exact_safe .== 0] .= 1e-10 
 
-p2 = Plots.plot(z_range, pgf_safe(dA_exact ./ dA_exact_safe, limit=100.0), label="Exact", color=line_colors[1], legend=:none)
-Plots.plot!(p2, z_range, pgf_safe(dA_flrw_arr ./ dA_exact_safe, limit=100.0), label=L"\text{FLRW}", color=:black, ls=:dash, alpha=0.5)
-Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.000, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.000", ls=:dash, color=line_colors[2])
-Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.002, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.002", ls=:dot, color=line_colors[3])
-Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.004, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.004", ls=:dashdot, color=line_colors[4])
-Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.006, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe, limit=100.0), label=L"z_*=0.006", ls=:dashdotdot, color=line_colors[5])
+# Removed the legend here to avoid duplication, matching your successful template
+p2 = Plots.plot(z_range, pgf_safe(dA_exact ./ dA_exact_safe .- 1, limit=100.0), label="Exact", color=line_colors[1], legend=:none)
+Plots.plot!(p2, z_range, pgf_safe(dA_flrw_arr ./ dA_exact_safe .- 1, limit=100.0), label=L"\text{FLRW}", color=:black, ls=:dash, alpha=0.5)
+Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.000, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe .- 1, limit=100.0), label=L"z_*=0.000", ls=:dash, color=line_colors[2])
+Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.002, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe .- 1, limit=100.0), label=L"z_*=0.002", ls=:dot, color=line_colors[3])
+Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.004, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe .- 1, limit=100.0), label=L"z_*=0.004", ls=:dashdot, color=line_colors[4])
+Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.006, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe .- 1, limit=100.0), label=L"z_*=0.006", ls=:dashdotdot, color=line_colors[5])
 Plots.xlabel!(p2, L"z")
-Plots.ylabel!(p2, L"d_A/d_{A,\mathrm{exact}}")
-#Plots.title!(p2, L"d_A \ \mathrm{and \ expansion \ for \ fiducial \ light \ ray}")
+Plots.ylabel!(p2, L"(d_{A,\mathrm{exp}}-d_A)/d_A")
 Plots.xlims!(p2, 0, 0.008)
-Plots.ylims!(p2, -1, 3)
-#Plots.savefig(p2, joinpath(BASE_PLOT_DIR, "fiducial_ray_norm.pdf"))
-#Plots.savefig(p2, joinpath(BASE_PLOT_DIR, "fiducial_ray_norm.tex"))
+Plots.ylims!(p2, -1, 1)
+# Reduce top margin
 Plots.plot!(p2, top_margin=-5mm)
 
 # Combine p1 and p2, making p2 half the height of p1
@@ -199,6 +196,13 @@ function plot_sky(out_dir, file_prefix, title_tex, z_val, map_data)
     fig = Figure(size = (164, 145), figure_padding = 5)
     
     map_min, map_max = extrema(map_data.pixels)
+
+    # Stop Makie from stretching microscopic floating-point noise
+    if abs(map_max - map_min) < 1e-6
+        map_min -= 1e-6
+        map_max += 1e-6
+    end
+
     img, _, _ = Healpix.mollweide(map_data)
     
     gl = fig[1, 1] = GridLayout(tellwidth = true)
@@ -243,8 +247,8 @@ function plot_sky(out_dir, file_prefix, title_tex, z_val, map_data)
     save(joinpath(out_dir, "$(file_prefix).pdf"), fig)
 end
 
-# Range from 0.000 to 0.020 with 0.001 steps
-z_vals = 0.000:0.001:0.020
+# Range from 0.000 to 0.008 with 0.001 steps
+z_vals = 0.000:0.001:0.008
 map_types = [
     ("dA",     "d",        dA_map),
     ("dA_z",   "d'",       dA_z_map),
@@ -284,6 +288,13 @@ for z_val in z_vals
                 hmap_contrast[:] = (data_array[:, z_idx] .- flrw_val)
                 tex_title = "\\Delta $tex_name"
             end
+
+            # --- TRACKING ADDED HERE (For each contrast map) ---
+            bg_val_contrast = median(hmap_contrast.pixels)
+            open(joinpath(BASE_PLOT_DIR, "background_tracking_contrast.txt"), "a") do file
+                println(file, "z = $z_str | Map = $f_prefix | Background = $bg_val_contrast")
+            end
+
             plot_sky(z_dir, "$(f_prefix)_contrast", tex_title, z_val, hmap_contrast)
         end
         
@@ -296,6 +307,79 @@ for z_val in z_vals
         plot_sky(z_dir, "expansion_error_z0_anchor", "\\frac{d_{A,\\mathrm{exp}} - d_{A}}{d_{A}}", z_val, error_hmap)
     end
 end
+
+
+# =============================================================================
+# Order-by-Order Expansion Error Sky Maps evaluated at z = 0.010
+# =============================================================================
+println("Generating Expansion Order Error Maps evaluated at z = 0.010...")
+
+z_target = 0.002
+iz_target = round(Int, z_target * 1e5 + 1)
+dA_exact_target = dA_map[:, iz_target]
+
+# Define your given list of anchor redshifts (z_*)
+anchor_z_vals = [0.000, 0.001, 0.003, 0.005] 
+
+# Create a dedicated directory so they don't get mixed in with the standard z_ folders
+target_dir = joinpath(BASE_PLOT_DIR, "expansion_errors_at_z0.002")
+isdir(target_dir) || mkdir(target_dir)
+
+for z_star in anchor_z_vals
+    iz_star = round(Int, z_star * 1e5 + 1)
+    Δz = z_target - z_star
+    z_str = @sprintf("%.3f", z_star)
+    
+    # Get derivatives at the anchor z_*
+    dA_0   = dA_map[:, iz_star]
+    dA_1_z = dA_z_map[:, iz_star]
+    dA_2_z = dA_zz_map[:, iz_star]
+    dA_3_z = dA_zzz_map[:, iz_star]
+    
+    # Calculate expansions evaluated at z_target
+    dA_exp_0 = dA_0
+    dA_exp_1 = @. dA_exp_0 + dA_1_z * Δz
+    dA_exp_2 = @. dA_exp_1 + 0.5 * dA_2_z * Δz^2
+    dA_exp_3 = @. dA_exp_2 + (1/6) * dA_3_z * Δz^3
+    
+    # Calculate relative errors compared to the exact map at z_target
+    rel_err_0 = @. (dA_exp_0 - dA_exact_target) / dA_exact_target
+    rel_err_1 = @. (dA_exp_1 - dA_exact_target) / dA_exact_target
+    rel_err_2 = @. (dA_exp_2 - dA_exact_target) / dA_exact_target
+    rel_err_3 = @. (dA_exp_3 - dA_exact_target) / dA_exact_target
+    
+    # Bundle for easy plotting
+    orders = [
+        (0, rel_err_0),
+        (1, rel_err_1),
+        (2, rel_err_2),
+        (3, rel_err_3)
+    ]
+    
+    for (order, err_map_data) in orders
+        error_hmap = HealpixMap{Float64, NestedOrder}(NSIDE)
+        error_hmap[:] = err_map_data
+        
+        # 1. Calculate the robust background value
+        # The median ignores the exploding ring and finds the background
+        bg_val = median(error_hmap.pixels)
+
+        # 2. Append it to a tracking file
+        # Using "a" opens the file in append mode, creating it if it doesn't exist
+        open(joinpath(BASE_PLOT_DIR, "background_tracking.txt"), "a") do file
+            # You can format this however is most useful for you
+            println(file, "z_target = $z_target | z_anchor = $z_str | Order = $order | Background = $bg_val")
+        end
+
+        # Format the LaTeX title exactly as requested
+        tex_title = "(d_A^{($order)} - d_A)/(d_A) |_{z_*=$z_str}"
+        file_name = "error_order_$(order)_anchor_$(z_str)"
+        
+        plot_sky(target_dir, file_name, tex_title, z_target, error_hmap)
+    end
+end
+println("Expansion maps saved to $(target_dir)/")
+
 
 # =============================================================================
 # 1D Error Analysis & Final Plotting
@@ -318,20 +402,39 @@ for gap in [1, 2, 4]
     rel_error = zeros(Float64, NPIX, nz)
     for i in 1:nz
         if z_range[i] > 0.0
-            rel_error[:, i] = (dA_map[:, i] .- full_map[:, i]) ./ dA_map[:, i]
+            rel_error[:, i] = (full_map[:, i].- dA_map[:, i]) ./ dA_map[:, i]
         end
     end
     
     mean_err  = mean(rel_error, dims=1)[:]
     std_err   = std(rel_error, dims=1)[:] 
+    p3 = Plots.plot(
+        z_range, pgf_safe(mean_err, limit=10.0), 
+        label=L"\mathrm{Mean}", 
+        color=line_colors[1], 
+        legend=:topright, 
+        
+        # --- FONT SIZES ---
+        titlefont  = font(10, "Computer Modern"),
+        guidefont  = font(10, "Computer Modern"), # xlabel/ylabel
+        tickfont   = font(9, "Computer Modern"),  # tick labels
+        legendfont = font(9, "Computer Modern"),  # legend text
+        
+        yformatter = y -> @sprintf("%.3f", y),
 
-    p3 = Plots.plot(z_range, pgf_safe(mean_err, limit=10.0), label=L"\mathrm{Mean}", left_margin = 3Plots.mm, color=line_colors[1], legend=:topright, size=(315, 270))
-    Plots.plot!(p3, z_range, pgf_safe(mean_err .+ std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} + 1\sigma", color=line_colors[2])
-    Plots.plot!(p3, z_range, pgf_safe(mean_err .- std_err, limit=10.0), linestyle=:dash, label=L"\mathrm{Mean} - 1\sigma", color=line_colors[3])
+        # --- EXACT DIMENSIONS ---
+        extra_kwargs = Dict(:subplot => Dict(
+            "width" => "0.80\\textwidth", 
+            "height" => "67mm"
+        ))
+    )
+    #p3 = Plots.plot(z_range, pgf_safe(mean_err, limit=10.0), label=L"\mathrm{Mean}", left_margin = 3Plots.mm, color=line_colors[1], legend=:topright, size=(315, 270))
+    Plots.plot!(p3, z_range, pgf_safe(mean_err .+ std_err, limit=10.0), linestyle=:dash, label=L"+\sigma", color=line_colors[2])
+    Plots.plot!(p3, z_range, pgf_safe(mean_err .- std_err, limit=10.0), linestyle=:dash, label=L"-\sigma", color=line_colors[3])
     Plots.xlims!(p3, 0, 0.008)
     Plots.ylims!(p3, -2*maximum(abs.(mean_err)), 2*maximum(abs.(mean_err)))
-    Plots.xlabel!(p3, "z")
-    Plots.ylabel!(p3, L"(d_A - d_{A,\mathrm{exp}}) / d_A")
+    Plots.xlabel!(p3, L"z")
+    Plots.ylabel!(p3, L"(d_{A,\mathrm{exp}} - d_A) / d_A")
     Plots.title!(p3, "Relative error LTB2 ($(Int(20 / gap + 1)) redshifts)")
     Plots.savefig(p3, joinpath(BASE_PLOT_DIR, "relative_error$(Int(20 / gap + 1)).pdf"))
     Plots.savefig(p3, joinpath(BASE_PLOT_DIR, "relative_error$(Int(20 / gap + 1)).tex"))
