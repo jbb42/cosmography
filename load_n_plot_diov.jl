@@ -178,7 +178,7 @@ Plots.plot!(p2, top_margin=-5mm)
 
 # Combine p1 and p2, making p2 half the height of p1
 p_combined = Plots.plot(p1, p2, 
-    layout = grid(2, 1, heights=[2/3, 1/3]),
+    layout = grid(2, 1, heights=[3/5, 2/5]),
     link = :x 
 )
 
@@ -372,7 +372,7 @@ for z_star in anchor_z_vals
         end
 
         # Format the LaTeX title exactly as requested
-        tex_title = "(d_A^{($order)} - d_A)/(d_A) |_{z_*=$z_str}"
+        tex_title = "(d_A^{($order)}(z_*=$z_str) - d_A)/(d_A)"
         file_name = "error_order_$(order)_anchor_$(z_str)"
         
         plot_sky(target_dir, file_name, tex_title, z_target, error_hmap)

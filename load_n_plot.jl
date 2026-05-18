@@ -372,7 +372,7 @@ for z_star in anchor_z_vals
         end
 
         # Format the LaTeX title exactly as requested
-        tex_title = "(d_A^{($order)} - d_A)/(d_A) |_{z_*=$z_str}"
+        tex_title = "(d_A^{($order)}(z_*=$z_str) - d_A)/(d_A)"
         file_name = "error_order_$(order)_anchor_$(z_str)"
         
         plot_sky(target_dir, file_name, tex_title, z_target, error_hmap)
@@ -438,4 +438,3 @@ for gap in [1, 2, 4]
 end
 
 println("Done! All plots saved cleanly to subdirectories inside $(BASE_PLOT_DIR)/")
-
