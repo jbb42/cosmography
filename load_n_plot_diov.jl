@@ -46,7 +46,7 @@ Plots.default(
     guidefont  = font(11, "Computer Modern"), # Matches Makie labelsize
     tickfont   = font(10, "Computer Modern"), # Matches Makie ticklabelsize
     legendfont = font(10, "Computer Modern"), 
-    size       = (315, 375),  
+    size       = (315, 400),  
     linewidth  = 1,         
     legend     = :topleft     
 )
@@ -146,7 +146,7 @@ println("Generating 1D plots...")
 
 dA_flrw_arr = dA_FLRW.(z_range)
 
-p1 = Plots.plot(z_range, pgf_safe(dA_exact), label="Exact", color=line_colors[1], legend=:bottomright)
+p1 = Plots.plot(z_range, pgf_safe(dA_exact), label=L"\text{Exact}", color=line_colors[1], legend=:bottomright)
 Plots.plot!(p1, z_range, pgf_safe(dA_flrw_arr), label=L"\text{FLRW}", color=:black, ls=:dash, alpha=0.5)
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.000, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.000", ls=:dash, color=line_colors[2])
 Plots.plot!(p1, z_range, pgf_safe(dA_exp(0.002, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact)), label=L"z_*=0.002", ls=:dot, color=line_colors[3])
@@ -163,7 +163,7 @@ dA_exact_safe = copy(dA_exact)
 dA_exact_safe[dA_exact_safe .== 0] .= 1e-10 
 
 # Removed the legend here to avoid duplication, matching your successful template
-p2 = Plots.plot(z_range, pgf_safe(dA_exact ./ dA_exact_safe .- 1, limit=100.0), label="Exact", color=line_colors[1], legend=:none)
+p2 = Plots.plot(z_range, pgf_safe(dA_exact ./ dA_exact_safe .- 1, limit=100.0), label=L"\text{Exact}", color=line_colors[1], legend=:none)
 Plots.plot!(p2, z_range, pgf_safe(dA_flrw_arr ./ dA_exact_safe .- 1, limit=100.0), label=L"\text{FLRW}", color=:black, ls=:dash, alpha=0.5)
 Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.000, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe .- 1, limit=100.0), label=L"z_*=0.000", ls=:dash, color=line_colors[2])
 Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.002, z_range, dA_exact, dA_z_exact, dA_zz_exact, dA_zzz_exact) ./ dA_exact_safe .- 1, limit=100.0), label=L"z_*=0.002", ls=:dot, color=line_colors[3])
@@ -172,13 +172,13 @@ Plots.plot!(p2, z_range, pgf_safe(dA_exp(0.006, z_range, dA_exact, dA_z_exact, d
 Plots.xlabel!(p2, L"z")
 Plots.ylabel!(p2, L"(d_{A,\mathrm{exp}}-d_A)/d_A")
 Plots.xlims!(p2, 0, 0.008)
-Plots.ylims!(p2, -1, 1)
+Plots.ylims!(p2, -0.5, 1)
 # Reduce top margin
 Plots.plot!(p2, top_margin=-5mm)
 
 # Combine p1 and p2, making p2 half the height of p1
 p_combined = Plots.plot(p1, p2, 
-    layout = grid(2, 1, heights=[3/5, 2/5]),
+    layout = grid(2, 1, heights=[4/7, 3/7]),
     link = :x 
 )
 
