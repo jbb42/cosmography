@@ -380,7 +380,6 @@ for z_star in anchor_z_vals
 end
 println("Expansion maps saved to $(target_dir)/")
 
-
 # =============================================================================
 # 1D Error Analysis & Final Plotting
 # =============================================================================
@@ -420,13 +419,15 @@ for gap in [1, 2, 4]
         tickfont   = font(9, "Computer Modern"),  # tick labels
         legendfont = font(9, "Computer Modern"),  # legend text
         
-        yformatter = y -> @sprintf("%.3f", y),
+        yformatter = y -> @sprintf("%.3g", y),
 
         # --- EXACT DIMENSIONS ---
         extra_kwargs = Dict(:subplot => Dict(
             "width" => "0.80\\textwidth", 
             "height" => "67mm"
-        ))
+        )),
+
+        margin = 1Plots.mm
     )
     #p3 = Plots.plot(z_range, pgf_safe(mean_err, limit=10.0), label=L"\mathrm{Mean}", left_margin = 3Plots.mm, color=line_colors[1], legend=:topright, size=(315, 270))
     Plots.plot!(p3, z_range, pgf_safe(mean_err .+ std_err, limit=10.0), linestyle=:dash, label=L"+\sigma", color=line_colors[2])
